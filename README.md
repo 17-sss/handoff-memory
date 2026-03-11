@@ -2,8 +2,6 @@
 
 A collection of reusable skills for AI coding agents. Skills are packaged instructions and helper scripts that extend agent capabilities while keeping the workflow repository-friendly.
 
-This repository is modeled as a multi-skill catalog, similar to `vercel-labs/agent-skills`, so more skills can be added over time without changing the top-level layout.
-
 ## Available Skills
 
 ### handoff-memory
@@ -23,21 +21,27 @@ Agent-neutral workflow for creating and maintaining shared repo-local HANDOFF do
 
 ## Installation
 
-Install the collection with:
+Install a specific skill from this repository:
 
 ```bash
-npx skills add 17-sss/agent-skills
+npx skills add https://github.com/17-sss/agent-skills --skill <skill-name>
 ```
 
-If your installer expects a path inside a multi-skill repository, install:
+Example:
 
 ```bash
-skills/handoff-memory
+npx skills add https://github.com/17-sss/agent-skills --skill handoff-memory
+```
+
+Install all skills only when you explicitly want the full collection:
+
+```bash
+npx skills add https://github.com/17-sss/agent-skills --all
 ```
 
 ## Usage
 
-Once installed, agents can invoke the skill when a task calls for project handoff creation, refresh, or recovery.
+Once installed, agents can invoke the relevant skill when a task matches it. Detailed usage, install scope, and workflow notes live inside each skill package under `skills/<skill-name>/README.md`.
 
 ## Repository Structure
 
