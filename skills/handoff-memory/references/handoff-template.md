@@ -1,3 +1,10 @@
+# Handoff Templates
+
+Use one canonical handoff per scope. Optional timestamped snapshots are secondary archives, not the primary shared state.
+
+## Repo Handoff
+
+```md
 # HANDOFF
 
 ## Metadata
@@ -9,44 +16,128 @@
 - Last Updated:
 - Updated By:
 
+## TL;DR
+
+- Summarize the current situation in 2-3 bullets.
+
 ## Current Objective
 
-State the immediate goal in 1-2 lines.
+- State the immediate goal for the next session.
 
 ## Current State
 
-Summarize the current implementation or investigation status.
+- What is done:
+- What is in progress:
+- What still needs confirmation:
 
-## Important Context
+## Recent Changes
 
-- Key decisions:
-- Constraints:
-- Relevant files:
-- Useful commands:
+- Change:
+- Validation:
+- Impact:
 
-## Changes Made
+## Known Issues / Watch List
 
-- List material code or config changes.
-- Mention what was tried and what did not land if it affects the next step.
+- Issue:
+- Risk:
+- Workaround:
+
+## Quick Reference
+
+- Key files:
+- Commands:
+- Links / dashboards:
 
 ## Validation
 
-- Tests run:
+- Checks run:
 - Results:
 - Not run yet:
 
-## Open Questions / Risks
-
-- List unresolved decisions, blockers, and likely failure points.
-
 ## Next Actions
 
-1. Put the next concrete step here.
-2. Add the step after that.
-3. Stop when the list becomes speculative.
+1. Put the first concrete next step here.
+2. Add the second step only if it is already justified by the current state.
+
+## Resume Checklist
+
+- Re-open the files most relevant to the active task.
+- Re-run the most relevant check before making more changes.
+- Confirm the first next action still matches the repo state.
 
 ## Resume Prompt
 
-Write a short prompt the next session can use immediately, for example:
+Continue this project from the shared HANDOFF document. First verify the repo still matches the notes, then complete the first unfinished next action.
+```
 
-Continue this project from the shared HANDOFF document. First verify the repo still matches the notes, then execute the next action.
+## Workspace Handoff
+
+```md
+# HANDOFF
+
+## Metadata
+
+- Workspace:
+- Root:
+- Last Updated:
+- Updated By:
+
+## TL;DR
+
+- Summarize the cross-repo situation in 2-3 bullets.
+
+## Current Objective
+
+- State the shared goal for the next session.
+
+## Current State
+
+- What is stable:
+- What is in progress:
+- What still needs confirmation:
+
+## Repo Impact
+
+- Repositories involved:
+- Cross-repo dependencies:
+- Shared blockers:
+
+## Recent Changes
+
+- Change:
+- Validation:
+- Impact:
+
+## Known Issues / Watch List
+
+- Issue:
+- Risk:
+- Workaround:
+
+## Quick Reference
+
+- Key repositories:
+- Shared commands:
+- Dashboards / docs:
+
+## Validation
+
+- Checks run:
+- Results:
+- Not run yet:
+
+## Next Actions
+
+1. Put the first coordination step here.
+2. Add the next step only if it is already justified by the current state.
+
+## Resume Checklist
+
+- Verify each impacted repo still matches the notes.
+- Re-run the highest-signal shared check before editing further.
+- Confirm the first next action still matches the workspace state.
+
+## Resume Prompt
+
+Continue this workspace from the shared HANDOFF document. First verify the involved repositories still match the notes, then complete the first unfinished next action.
+```

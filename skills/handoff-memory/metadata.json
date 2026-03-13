@@ -1,11 +1,11 @@
 {
   "name": "handoff-memory",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "organization": "17-sss",
   "date": "March 2026",
-  "abstract": "Agent-neutral workflow for creating and maintaining shared handoff and memory documents for either a single repository or a multi-repository workspace. Designed to preserve project state across sessions, contributors, and machines while keeping the primary mutable files inside the repository or workspace root, with `docs/HANDOFF.md` as the repo default and `_memory/` as the workspace default.",
+  "abstract": "Agent-neutral workflow for creating, refreshing, validating, and resuming shared handoff and memory documents for either a single repository or a multi-repository workspace. Designed to preserve current state in a canonical Git-trackable file while optionally keeping timestamped session snapshots under `docs/handoffs/` or `_memory/handoffs/`.",
   "references": [
-    "https://agentskills.io/",
-    "https://github.com/vercel-labs/agent-skills"
+    "https://skills.sh/softaworks/agent-toolkit/session-handoff",
+    "https://skills.sh/wshobson/agents/on-call-handoff-patterns"
   ]
 }

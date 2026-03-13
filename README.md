@@ -18,6 +18,8 @@ Agent-neutral workflow for creating and maintaining shared repo-local or workspa
 **Behavior:**
 - Reuses an existing shared handoff file such as `docs/HANDOFF.md`, `memories/HANDOFF.md`, or `HANDOFF.md`
 - Defaults to `docs/HANDOFF.md` for a repo and `_memory/HANDOFF.md` for a workspace
+- Adds helper scripts for create, validate, and staleness checks
+- Supports optional timestamped snapshots under `docs/handoffs/` or `_memory/handoffs/`
 - Supports global or project-local skill installation, while keeping the shared data inside the repository or workspace root
 
 ## Installation
