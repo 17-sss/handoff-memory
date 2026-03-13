@@ -30,5 +30,6 @@ This package defines the `handoff-memory` skill.
 - Keep `SKILL.md`, `README.md`, and `metadata.json` aligned
 - Update templates if the expected memory sections change
 - Keep the scripts in `scripts/` aligned with the documented workflow
+- Keep `references/agent-usage-best-practices.md` aligned with the actual recommended agent flow
 - Most sessions should still update only the canonical handoff document
 - Do not reintroduce global machine-local storage as the default behavior

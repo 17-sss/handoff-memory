@@ -67,6 +67,16 @@ The skill itself can be installed globally or per-project. The shared HANDOFF da
 
 The primary memory files should stay inside the repository or workspace root they describe so they can be reviewed and synchronized with Git when appropriate. Installation location and data location are separate concerns.
 
+## Best Practices
+
+If an agent is using this skill continuously, follow [agent-usage-best-practices.md](references/agent-usage-best-practices.md). The short version:
+
+- Start by resolving the canonical handoff and checking staleness
+- Update only one canonical handoff per active scope
+- Touch workspace companion files only when durable shared context changed
+- Use snapshots only for meaningful transitions
+- Validate strictly before ending the session
+
 ## Recommended Commands
 
 Initialize or refresh the canonical file:
@@ -103,5 +113,6 @@ python3 scripts/check_staleness.py --project-root <path> --scope auto --document
 - `scripts/check_staleness.py` - Checks whether the notes lag behind repo activity
 - `scripts/resolve_handoff_path.py` - Path resolver and initializer
 - `references/handoff-template.md` - HANDOFF template
+- `references/agent-usage-best-practices.md` - Recommended agent workflow
 - `references/workspace-memory-guide.md` - Workspace memory structure guidance
 - `references/agent-integrations.md` - Agent-specific install notes

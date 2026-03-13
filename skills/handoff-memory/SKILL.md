@@ -38,6 +38,8 @@ Use this as the default flow unless the user already has a stronger convention:
 
 Use `--snapshot` with `create_handoff.py` when the user wants a timestamped session archive. Do not make snapshots the default shared state.
 
+For day-to-day agent behavior, follow `references/agent-usage-best-practices.md`.
+
 ## Path Rules
 
 - Prefer an explicit `--handoff-path` when the project already defines a canonical location.
@@ -137,6 +139,10 @@ Use this to understand the expected handoff structure and section intent.
 ### `references/workspace-memory-guide.md`
 
 Use this when the task spans multiple repositories and you need to decide whether the canonical workspace handoff is enough or whether a durable companion document should also change.
+
+### `references/agent-usage-best-practices.md`
+
+Use this when you want the recommended start-of-session, end-of-session, and scope-selection behavior for agents using this skill in normal work.
 
 ### `references/agent-integrations.md`
 
