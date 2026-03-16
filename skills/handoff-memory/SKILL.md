@@ -37,7 +37,7 @@ Use this as the default flow unless the user already has a stronger convention:
 5. When resuming, check staleness before trusting old notes.
    Run `scripts/check_staleness.py --project-root <path> --scope auto --document handoff`.
 
-Use `--snapshot` with `create_handoff.py` when the user wants a timestamped session archive. Do not make snapshots the default shared state.
+Use `--snapshot` with `create_handoff.py` only when the user wants a timestamped checkpoint that is worth preserving. Always pair it with `--snapshot-kind` and a short `--snapshot-reason`. Do not make snapshots the default shared state.
 
 For day-to-day agent behavior, follow `references/agent-usage-best-practices.md`.
 
@@ -139,7 +139,7 @@ Resolve the canonical repo-local, workspace-wide, or workstream-specific memory 
 
 ### `scripts/create_handoff.py`
 
-Initialize or refresh the canonical file and sync metadata such as project root, branch, and update timestamp. Use `--snapshot` to write a timestamped archive copy before the canonical file is refreshed.
+Initialize or refresh the canonical file and sync metadata such as project root, branch, and update timestamp. Use `--snapshot --snapshot-kind <kind> --snapshot-reason <text>` to write a timestamped archive copy before the canonical file is refreshed.
 
 ### `scripts/validate_handoff.py`
 
@@ -162,6 +162,10 @@ Use this when the task spans multiple repositories and you need to decide whethe
 ### `references/agent-usage-best-practices.md`
 
 Use this when you want the recommended start-of-session, end-of-session, and scope-selection behavior for agents using this skill in normal work.
+
+### `references/snapshot-strategy.md`
+
+Use this when you need explicit guidance on when to create a snapshot, when not to, and which snapshot kind to use.
 
 ### `references/agent-integrations.md`
 

@@ -88,7 +88,7 @@ If an agent is using this skill continuously, follow [agent-usage-best-practices
 - Update only one canonical handoff per active scope
 - Use a workstream when one workspace hosts multiple independent repo combinations
 - Touch workspace or workstream companion files only when durable shared context changed
-- Use snapshots only for meaningful transitions
+- Use snapshots only for meaningful transitions, with an explicit kind and reason
 - Validate strictly before ending the session
 
 ## Recommended Commands
@@ -114,7 +114,7 @@ python3 scripts/create_handoff.py --project-root <path> --scope workspace --work
 Write a timestamped snapshot before refreshing:
 
 ```bash
-python3 scripts/create_handoff.py --project-root <path> --scope auto --document handoff --snapshot
+python3 scripts/create_handoff.py --project-root <path> --scope auto --document handoff --snapshot --snapshot-kind handoff --snapshot-reason "Context transfer before ending the session"
 ```
 
 Validate structure before ending the session:
@@ -146,5 +146,6 @@ python3 scripts/check_staleness.py --project-root <path> --scope workspace --wor
 - `scripts/resolve_handoff_path.py` - Path resolver and initializer
 - `references/handoff-template.md` - HANDOFF template
 - `references/agent-usage-best-practices.md` - Recommended agent workflow
+- `references/snapshot-strategy.md` - When to snapshot and how to label it
 - `references/workspace-memory-guide.md` - Workspace memory structure guidance
 - `references/agent-integrations.md` - Agent-specific install notes

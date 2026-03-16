@@ -37,6 +37,7 @@ This package defines the `handoff-memory` skill.
 - Update templates if the expected memory sections change
 - Keep the scripts in `scripts/` aligned with the documented workflow
 - Keep `references/agent-usage-best-practices.md` aligned with the actual recommended agent flow
+- Keep `references/snapshot-strategy.md` aligned with snapshot kinds and script flags
 - Most sessions should still update only the canonical handoff document
 - Preserve the difference between workspace-wide and workstream-specific documents
 - Do not reintroduce global machine-local storage as the default behavior

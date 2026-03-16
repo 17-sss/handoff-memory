@@ -10,8 +10,10 @@ from pathlib import Path
 
 from handoff_lib import (
     DOCUMENT_CHOICES,
+    SNAPSHOT_KINDS,
     create_snapshot,
     ensure_document,
+    infer_workstream_repositories,
     replace_repositories_in_text,
     resolve_document,
     sync_metadata,
@@ -53,6 +55,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write a timestamped snapshot before refreshing the canonical file. Intended for handoff documents.",
     )
     parser.add_argument(
+        "--snapshot-kind",
+        choices=SNAPSHOT_KINDS,
+        help="Why this snapshot exists. Required with --snapshot so snapshots stay intentional.",
+    )
+    parser.add_argument(
+        "--snapshot-reason",
+        help="Short explanation of why this snapshot is worth keeping.",
+    )
+    parser.add_argument(
         "--snapshot-label",
         help="Optional label used in the snapshot file name.",
     )
@@ -86,6 +97,13 @@ def main() -> int:
     except ValueError as error:
         parser.error(str(error))
 
+    if args.snapshot and not args.snapshot_kind:
+        parser.error("--snapshot requires --snapshot-kind.")
+    if args.snapshot_reason and not args.snapshot:
+        parser.error("--snapshot-reason requires --snapshot.")
+    if args.snapshot_kind and not args.snapshot:
+        parser.error("--snapshot-kind requires --snapshot.")
+
     existed_before = resolution.handoff_path.exists()
     previous_text = (
         resolution.handoff_path.read_text(encoding="utf-8")
@@ -94,6 +112,16 @@ def main() -> int:
     )
     created = ensure_document(resolution)
     snapshot_path = None
+    snapshot_repositories = list(args.repository)
+    if not snapshot_repositories:
+        if resolution.target_scope == "repo":
+            snapshot_repositories = [resolution.project_root.name]
+        elif resolution.target_scope == "workstream" and resolution.workstream:
+            inferred, _ = infer_workstream_repositories(
+                resolution.project_root,
+                resolution.workstream,
+            )
+            snapshot_repositories = [path.name for path in inferred]
     if args.snapshot:
         if args.document != "handoff":
             parser.error("--snapshot only supports --document handoff.")
@@ -102,6 +130,9 @@ def main() -> int:
                 resolution,
                 previous_text,
                 label=args.snapshot_label,
+                kind=args.snapshot_kind,
+                reason=args.snapshot_reason,
+                repositories=snapshot_repositories,
             )
 
     updated_text = sync_metadata(
@@ -122,7 +153,10 @@ def main() -> int:
         "created": created,
         "updated": changed or created,
         "snapshot_path": str(snapshot_path) if snapshot_path else None,
+        "snapshot_kind": args.snapshot_kind,
+        "snapshot_reason": args.snapshot_reason,
         "repositories": args.repository,
+        "snapshot_repositories": snapshot_repositories,
     }
 
     if args.format == "json":

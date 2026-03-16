@@ -12,6 +12,7 @@ Prefer one canonical handoff per active scope.
 - Only touch `_memory/WORKSPACE.md`, `_memory/DECISIONS.md`, or `_memory/PATTERNS.md` when durable shared context changed
 - Use `_memory/workstreams/<name>/WORKSTREAM.md`, `DECISIONS.md`, or `PATTERNS.md` only when that workstream's durable context changed
 - Use snapshots only when the extra history is worth keeping
+- When creating a snapshot, always choose a `--snapshot-kind` and add a short `--snapshot-reason`
 
 ## Start-of-Session Flow
 
@@ -63,7 +64,7 @@ python3 scripts/create_handoff.py --project-root <path> --scope auto --document 
 2. Add a snapshot only when it buys real value.
 
 ```bash
-python3 scripts/create_handoff.py --project-root <path> --scope auto --document handoff --snapshot
+python3 scripts/create_handoff.py --project-root <path> --scope auto --document handoff --snapshot --snapshot-kind handoff --snapshot-reason "Context transfer before ending the session"
 ```
 
 Good reasons to snapshot:
@@ -72,6 +73,19 @@ Good reasons to snapshot:
 - A major context handoff between people or agents
 - A large rewrite of the canonical handoff
 - A debugging session whose intermediate state may matter later
+
+If you are unsure, skip the snapshot and keep the canonical handoff current instead.
+
+Snapshot kinds:
+
+- `handoff`
+- `risk`
+- `deploy`
+- `migration`
+- `debug`
+- `decision`
+- `milestone`
+- `other`
 
 3. Validate before you stop.
 
@@ -115,6 +129,7 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 
 - Appending the full conversation to the handoff
 - Letting snapshots replace the canonical handoff
+- Creating snapshots for every routine update
 - Updating all workspace documents every session
 - Mixing unrelated repo combinations into one workspace handoff
 - Copying repo-level detail into `_memory/HANDOFF.md` when it does not affect coordination
@@ -126,3 +141,5 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 - "Resume from the canonical handoff, check for staleness, and call out any drift before editing."
 - "Write or refresh the repo handoff using the current code state, then validate it strictly."
 - "Update the workspace handoff only for cross-repo coordination and keep repo-specific detail in the repo handoffs."
+
+For more detailed guidance, see [snapshot-strategy.md](snapshot-strategy.md).

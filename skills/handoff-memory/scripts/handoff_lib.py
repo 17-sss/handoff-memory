@@ -290,6 +290,16 @@ REPO_DOCUMENTS = {
 WORKSPACE_ROOT = Path("_memory")
 WORKSTREAMS_ROOT = WORKSPACE_ROOT / "workstreams"
 SNAPSHOT_DIRNAME = "handoffs"
+SNAPSHOT_KINDS = (
+    "handoff",
+    "risk",
+    "deploy",
+    "migration",
+    "debug",
+    "decision",
+    "milestone",
+    "other",
+)
 WORKSPACE_DOCUMENTS = {
     "handoff": (Path("HANDOFF.md"), WORKSPACE_HANDOFF_TEMPLATE),
     "workspace": (Path("WORKSPACE.md"), WORKSPACE_OVERVIEW_TEMPLATE),
@@ -748,18 +758,38 @@ def create_snapshot(
     resolution: Resolution,
     source_text: str,
     label: str | None = None,
+    kind: str = "handoff",
+    reason: str | None = None,
+    repositories: list[str] | None = None,
     now: datetime | None = None,
 ) -> Path:
     timestamp = (now or datetime.now()).strftime("%Y-%m-%d-%H%M%S")
     base_label = label or resolution.workstream or resolution.project_root.name
     snapshot_dir = snapshot_directory(resolution)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
-    candidate = snapshot_dir / f"{timestamp}-{slugify(base_label)}.md"
+    candidate = snapshot_dir / f"{timestamp}-{slugify(kind)}-{slugify(base_label)}.md"
     index = 1
     while candidate.exists():
-        candidate = snapshot_dir / f"{timestamp}-{slugify(base_label)}-{index}.md"
+        candidate = snapshot_dir / f"{timestamp}-{slugify(kind)}-{slugify(base_label)}-{index}.md"
         index += 1
-    candidate.write_text(source_text, encoding="utf-8")
+    created_at = iso_timestamp(now)
+    repo_text = ", ".join(repositories or []) or "n/a"
+    metadata_lines = [
+        "# SNAPSHOT METADATA",
+        "",
+        f"- Created At: {created_at}",
+        f"- Scope: {resolution.target_scope}",
+        f"- Kind: {kind}",
+        f"- Source Canonical: {resolution.handoff_path}",
+        f"- Workspace: {resolution.project_root.name if resolution.target_scope != 'repo' else 'n/a'}",
+        f"- Workstream: {resolution.workstream or 'n/a'}",
+        f"- Repositories: {repo_text}",
+        f"- Reason: {reason or 'checkpoint'}",
+        "",
+        "---",
+        "",
+    ]
+    candidate.write_text("\n".join(metadata_lines) + source_text, encoding="utf-8")
     return candidate.resolve()
 
 
