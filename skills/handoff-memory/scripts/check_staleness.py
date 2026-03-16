@@ -10,6 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from handoff_lib import (
+    DOCUMENT_CHOICES,
+    infer_workstream_repositories,
+    match_workspace_repositories,
     repo_status,
     repository_children,
     resolve_document,
@@ -19,7 +22,7 @@ from handoff_lib import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Check whether the canonical handoff document is stale."
+        description="Check whether the canonical repo-local, workspace-wide, or workstream document is stale."
     )
     parser.add_argument("--project-root", default=".", help="Repository or workspace root.")
     parser.add_argument(
@@ -30,13 +33,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--document",
-        choices=("handoff", "workspace", "decisions", "patterns"),
+        choices=DOCUMENT_CHOICES,
         default="handoff",
-        help="Document type. Repo scope only supports handoff.",
+        help="Document type. Repo scope only supports handoff. Workstream-specific documents require --workstream.",
+    )
+    parser.add_argument(
+        "--workstream",
+        help="Optional workstream name for workspace tasks that should keep separate canonical documents under _memory/workstreams/<name>/.",
     )
     parser.add_argument(
         "--handoff-path",
         help="Explicit repo-local or absolute HANDOFF path. Relative paths are resolved from the project root.",
+    )
+    parser.add_argument(
+        "--repository",
+        action="append",
+        default=[],
+        help="Workspace repository name to evaluate for staleness. Repeat for multiple repositories.",
     )
     parser.add_argument(
         "--max-age-hours",
@@ -59,14 +72,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def summarize_scope_status(
     resolution,
+    repositories: list[Path],
 ) -> list[dict[str, object]]:
     ignore_paths = {resolution.handoff_path, snapshot_directory(resolution)}
-    project_root = resolution.project_root
-    scope = resolution.scope
-    if scope == "workspace":
-        repos = repository_children(project_root)
+    if resolution.target_scope == "workspace":
+        repos = repositories or repository_children(resolution.project_root)
         return [repo_status(repo_root) for repo_root in repos]
-    return [repo_status(project_root, ignore_paths=ignore_paths)]
+    if resolution.target_scope == "workstream":
+        return [repo_status(repo_root) for repo_root in repositories]
+    return [repo_status(resolution.project_root, ignore_paths=ignore_paths)]
 
 
 def latest_epoch(values: list[dict[str, object]], key: str) -> int | None:
@@ -84,6 +98,7 @@ def main() -> int:
             scope=args.scope,
             document=args.document,
             handoff_path=args.handoff_path,
+            workstream=args.workstream,
         )
     except ValueError as error:
         parser.error(str(error))
@@ -91,6 +106,7 @@ def main() -> int:
     default_age = 24.0 if resolution.scope == "workspace" else 72.0
     max_age_hours = args.max_age_hours if args.max_age_hours is not None else default_age
     reasons: list[str] = []
+    warnings: list[str] = []
 
     if not resolution.handoff_path.exists():
         payload = {
@@ -114,7 +130,25 @@ def main() -> int:
             f"Document is {age_hours} hours old, which exceeds the {max_age_hours}-hour threshold."
         )
 
-    scope_status = summarize_scope_status(resolution)
+    selected_repositories: list[Path] = []
+    repo_selection_source: str | None = None
+    if resolution.target_scope == "workstream":
+        if args.repository:
+            selected_repositories = match_workspace_repositories(
+                resolution.project_root,
+                args.repository,
+            )
+            repo_selection_source = "cli"
+        else:
+            selected_repositories, repo_selection_source = infer_workstream_repositories(
+                resolution.project_root,
+                resolution.workstream or "",
+            )
+        if not selected_repositories:
+            warnings.append(
+                "Workstream repositories are not declared; repo activity checks were skipped."
+            )
+    scope_status = summarize_scope_status(resolution, selected_repositories)
     latest_commit = latest_epoch(scope_status, "latest_commit_epoch")
     latest_dirty = latest_epoch(scope_status, "latest_dirty_epoch")
     dirty_repos = [status["root"] for status in scope_status if status["dirty_paths_count"]]
@@ -134,8 +168,11 @@ def main() -> int:
         "latest_commit_epoch": latest_commit,
         "latest_dirty_epoch": latest_dirty,
         "dirty_repositories": dirty_repos,
+        "selected_repositories": [str(path) for path in selected_repositories],
+        "repo_selection_source": repo_selection_source,
         "scope_status": scope_status,
         "reasons": reasons,
+        "warnings": warnings,
     }
 
     if args.format == "json":
@@ -149,6 +186,8 @@ def main() -> int:
         else:
             print("Fresh")
             print(f"- Age: {age_hours} hours")
+        for warning in warnings:
+            print(f"Warning: {warning}")
 
     return 1 if args.fail_if_stale and reasons else 0
 

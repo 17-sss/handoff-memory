@@ -5,10 +5,12 @@ Keep the shared HANDOFF data inside the repository even when the skill itself is
 ## Shared Data Rule
 
 - Repo default shared file: `docs/HANDOFF.md`
-- Workspace default shared file: `_memory/HANDOFF.md`
+- Workspace-wide shared file: `_memory/HANDOFF.md`
+- Workstream shared file: `_memory/workstreams/<name>/HANDOFF.md`
 - Optional snapshots: `docs/handoffs/*.md` or `_memory/handoffs/*.md`
 - Reuse an existing shared file if the project already uses `docs/HANDOFF.md`, `memories/HANDOFF.md`, or `HANDOFF.md`
 - Use `_memory/WORKSPACE.md`, `_memory/DECISIONS.md`, and `_memory/PATTERNS.md` for cross-repo workspace context
+- Use `_memory/workstreams/<name>/...` when one workspace hosts multiple independent repo combinations
 - Do not make `.codex`, `.claude`, `.windsurf`, or `.agents` the default shared mutable store
 - Most sessions should still update only the canonical handoff document
 

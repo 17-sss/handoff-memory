@@ -7,15 +7,18 @@ Use this guide when an agent is actively relying on `handoff-memory` during norm
 Prefer one canonical handoff per active scope.
 
 - Repo work: update `docs/HANDOFF.md`
-- Cross-repo work: update `_memory/HANDOFF.md`
+- Workspace-wide cross-repo work: update `_memory/HANDOFF.md`
+- Workstream-specific cross-repo work: update `_memory/workstreams/<name>/HANDOFF.md`
 - Only touch `_memory/WORKSPACE.md`, `_memory/DECISIONS.md`, or `_memory/PATTERNS.md` when durable shared context changed
+- Use `_memory/workstreams/<name>/WORKSTREAM.md`, `DECISIONS.md`, or `PATTERNS.md` only when that workstream's durable context changed
 - Use snapshots only when the extra history is worth keeping
 
 ## Start-of-Session Flow
 
 1. Detect the right scope before writing anything.
    - Single repo task: repo scope
-   - Parent folder coordinating multiple repos: workspace scope
+   - Parent folder coordinating one shared cross-repo effort: workspace-wide scope
+   - Parent folder with multiple independent repo combinations: workstream scope
 
 2. Resolve the canonical document first.
 
@@ -35,6 +38,7 @@ python3 scripts/check_staleness.py --project-root <path> --scope auto --document
    - `WORKSPACE.md` for repo map, ownership, or shared commands
    - `DECISIONS.md` for cross-repo decisions
    - `PATTERNS.md` for conventions worth reusing
+   - `workstreams/<name>/WORKSTREAM.md` for one initiative's repo set, purpose, or boundaries
 
 6. If the codebase drifted from the handoff, call it out and correct the handoff before relying on it.
 
@@ -44,7 +48,8 @@ python3 scripts/check_staleness.py --project-root <path> --scope auto --document
 - Keep `TL;DR`, `Current Objective`, and `Next Actions` especially fresh
 - Prefer exact paths, commands, and repo names
 - Keep implementation detail in repo handoffs, not in the workspace handoff
-- Keep cross-repo coordination in the workspace handoff, not duplicated into every repo handoff
+- Keep workspace-wide coordination in the workspace handoff
+- Keep initiative-specific coordination in the matching workstream handoff
 - When a task deeply changes one repo and lightly affects others, update the repo handoff in detail and keep the workspace handoff at the coordination level
 
 ## End-of-Session Flow
@@ -83,10 +88,17 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 - Multiple repos, one shared task:
   - update `_memory/HANDOFF.md`
   - update repo-local handoffs only for repos with meaningful implementation changes
+- Multiple repos, but only one initiative among several in the same workspace:
+  - update `_memory/workstreams/<name>/HANDOFF.md`
+  - keep `_memory/HANDOFF.md` as the workspace-wide summary or index if needed
 - New cross-repo technical decision:
   - update `_memory/DECISIONS.md`
+- New workstream-only technical decision:
+  - update `_memory/workstreams/<name>/DECISIONS.md`
 - New reusable convention:
   - update `_memory/PATTERNS.md`
+- New reusable convention that only applies to one initiative:
+  - update `_memory/workstreams/<name>/PATTERNS.md`
 - Workspace structure, ownership, or command changes:
   - update `_memory/WORKSPACE.md`
 
@@ -104,6 +116,7 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 - Appending the full conversation to the handoff
 - Letting snapshots replace the canonical handoff
 - Updating all workspace documents every session
+- Mixing unrelated repo combinations into one workspace handoff
 - Copying repo-level detail into `_memory/HANDOFF.md` when it does not affect coordination
 - Leaving template placeholders behind in a final handoff
 - Treating agent-specific folders as the primary mutable store

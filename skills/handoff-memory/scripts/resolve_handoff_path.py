@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve the canonical repo-local or workspace-local handoff path."""
+"""Resolve the canonical repo-local, workspace-wide, or workstream handoff path."""
 
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ import json
 import sys
 from pathlib import Path
 
-from handoff_lib import ensure_document, resolve_document
+from handoff_lib import DOCUMENT_CHOICES, ensure_document, resolve_document
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Resolve the canonical repo-local or workspace-local memory path."
+        description="Resolve the canonical repo-local, workspace-wide, or workstream memory path."
     )
     parser.add_argument(
         "--project-root",
@@ -28,9 +28,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--document",
-        choices=("handoff", "workspace", "decisions", "patterns"),
+        choices=DOCUMENT_CHOICES,
         default="handoff",
-        help="Document type. Workspace-only documents require --scope workspace or auto-detected workspace.",
+        help="Document type. Repo scope only supports handoff. Workstream-specific documents require --workstream.",
+    )
+    parser.add_argument(
+        "--workstream",
+        help="Optional workstream name for workspace tasks that should keep separate canonical documents under _memory/workstreams/<name>/.",
     )
     parser.add_argument(
         "--handoff-path",
@@ -60,6 +64,7 @@ def main() -> int:
             scope=args.scope,
             document=args.document,
             handoff_path=args.handoff_path,
+            workstream=args.workstream,
         )
     except ValueError as error:
         parser.error(str(error))

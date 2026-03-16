@@ -1,6 +1,6 @@
 # handoff-memory
 
-Agent-neutral workflow for maintaining shared handoff and memory documents for either a single repository or a multi-repository workspace.
+Agent-neutral workflow for maintaining shared handoff and memory documents for a single repository, a multi-repository workspace, or a workstream inside that workspace.
 
 ## Use When
 
@@ -15,6 +15,7 @@ Agent-neutral workflow for maintaining shared handoff and memory documents for e
 - Resolves shared memory files in either repo scope or workspace scope
 - Reuses an existing repo handoff at `docs/HANDOFF.md`, `memories/HANDOFF.md`, or `HANDOFF.md`
 - Defaults to `docs/HANDOFF.md` for a repo and `_memory/HANDOFF.md` for a workspace
+- Supports workstream-specific handoffs and memory under `_memory/workstreams/<name>/`
 - Adds lightweight operational tooling for `create`, `validate`, and `check_staleness`
 - Supports optional timestamped snapshots in `docs/handoffs/` or `_memory/handoffs/`
 - Keeps agent-specific files as references to the shared handoff, not as the primary mutable state
@@ -40,13 +41,25 @@ Use repo scope when the task belongs to one repository.
 
 Use workspace scope when the prompt starts from a parent folder that coordinates multiple repositories.
 
-- `_memory/HANDOFF.md` - current cross-repo status
+- `_memory/HANDOFF.md` - workspace-wide summary and active workstream index
 - `_memory/WORKSPACE.md` - durable workspace overview
 - `_memory/DECISIONS.md` - shared technical decisions
 - `_memory/PATTERNS.md` - repeated conventions across repos
 - `_memory/handoffs/*.md` - optional timestamped session snapshots
 
-Most sessions should only update `_memory/HANDOFF.md`. Touch the companion files only when durable shared context changed.
+Use these files when the whole workspace shares one active cross-repo context. Touch the companion files only when durable shared context changed.
+
+### Workstream Scope
+
+Use workstream scope when the same workspace contains multiple independent repo combinations or initiatives.
+
+- `_memory/workstreams/<name>/HANDOFF.md` - canonical handoff for that repo combination
+- `_memory/workstreams/<name>/WORKSTREAM.md` - durable overview for that workstream
+- `_memory/workstreams/<name>/DECISIONS.md` - workstream-specific decisions
+- `_memory/workstreams/<name>/PATTERNS.md` - workstream-specific conventions
+- `_memory/workstreams/<name>/handoffs/*.md` - optional timestamped snapshots
+
+Use workstream names for actual initiatives or streams of work, not just raw repo lists. For example, prefer `checkout-flow` over `frontend-backend`.
 
 ## Install Scope
 
@@ -73,7 +86,8 @@ If an agent is using this skill continuously, follow [agent-usage-best-practices
 
 - Start by resolving the canonical handoff and checking staleness
 - Update only one canonical handoff per active scope
-- Touch workspace companion files only when durable shared context changed
+- Use a workstream when one workspace hosts multiple independent repo combinations
+- Touch workspace or workstream companion files only when durable shared context changed
 - Use snapshots only for meaningful transitions
 - Validate strictly before ending the session
 
@@ -83,6 +97,18 @@ Initialize or refresh the canonical file:
 
 ```bash
 python3 scripts/create_handoff.py --project-root <path> --scope auto --document handoff
+```
+
+Initialize a workstream-specific handoff:
+
+```bash
+python3 scripts/create_handoff.py --project-root <path> --scope workspace --workstream <name> --document handoff
+```
+
+Initialize a durable workstream overview and record the involved repos:
+
+```bash
+python3 scripts/create_handoff.py --project-root <path> --scope workspace --workstream <name> --document workstream --repository <repo-a> --repository <repo-b>
 ```
 
 Write a timestamped snapshot before refreshing:
@@ -101,6 +127,12 @@ Check whether the current handoff is stale when resuming:
 
 ```bash
 python3 scripts/check_staleness.py --project-root <path> --scope auto --document handoff
+```
+
+Check staleness for one workstream only:
+
+```bash
+python3 scripts/check_staleness.py --project-root <path> --scope workspace --workstream <name> --document handoff
 ```
 
 ## Package Layout

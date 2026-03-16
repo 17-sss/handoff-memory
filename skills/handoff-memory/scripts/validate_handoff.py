@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from handoff_lib import (
+    DOCUMENT_CHOICES,
     empty_sections,
     extract_sections,
     placeholder_lines,
@@ -19,7 +20,7 @@ from handoff_lib import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Validate a canonical repo-local or workspace-local handoff document."
+        description="Validate a canonical repo-local, workspace-wide, or workstream document."
     )
     parser.add_argument("--project-root", default=".", help="Repository or workspace root.")
     parser.add_argument(
@@ -30,9 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--document",
-        choices=("handoff", "workspace", "decisions", "patterns"),
+        choices=DOCUMENT_CHOICES,
         default="handoff",
-        help="Document type. Repo scope only supports handoff.",
+        help="Document type. Repo scope only supports handoff. Workstream-specific documents require --workstream.",
+    )
+    parser.add_argument(
+        "--workstream",
+        help="Optional workstream name for workspace tasks that should keep separate canonical documents under _memory/workstreams/<name>/.",
     )
     parser.add_argument(
         "--handoff-path",
@@ -62,6 +67,7 @@ def main() -> int:
             scope=args.scope,
             document=args.document,
             handoff_path=args.handoff_path,
+            workstream=args.workstream,
         )
     except ValueError as error:
         parser.error(str(error))
@@ -81,10 +87,10 @@ def main() -> int:
 
     text = resolution.handoff_path.read_text(encoding="utf-8")
     sections = extract_sections(text)
-    required = list(required_sections(resolution.scope, resolution.document))
+    required = list(required_sections(resolution.target_scope, resolution.document))
     missing = [name for name in required if name not in sections]
     placeholders = placeholder_lines(text)
-    empty = empty_sections(text, resolution.scope, resolution.document)
+    empty = empty_sections(text, resolution.target_scope, resolution.document)
     warnings: list[str] = []
     if len(text.splitlines()) > 220:
         warnings.append("Document is longer than 220 lines; consider tightening it.")

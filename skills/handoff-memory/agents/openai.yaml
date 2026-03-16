@@ -1,4 +1,4 @@
 interface:
   display_name: "Handoff Memory"
-  short_description: "Create, validate, and resume repo or workspace handoffs"
-  default_prompt: "Use $handoff-memory to create, validate, or refresh the shared repo-local or workspace-local HANDOFF for this project."
+  short_description: "Create, validate, and resume repo, workspace, or workstream handoffs"
+  default_prompt: "Use $handoff-memory to create, validate, or refresh the shared repo-local, workspace-wide, or workstream-specific HANDOFF for this project."

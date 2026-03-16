@@ -1,13 +1,13 @@
 ---
 name: handoff-memory
-description: Create, refresh, validate, and resume shared HANDOFF and memory documents for either a single repository or a multi-repository workspace. Use when asked to write a handoff, checkpoint progress, resume prior work, or standardize project-state notes in Git-trackable files such as `docs/HANDOFF.md` for a repo or `_memory/HANDOFF.md` for a workspace root.
+description: Create, refresh, validate, and resume shared HANDOFF and memory documents for a repository, a workspace-wide cross-repo context, or a workstream inside a larger workspace. Use when asked to write a handoff, checkpoint progress, resume prior work, or standardize project-state notes in Git-trackable files such as `docs/HANDOFF.md`, `_memory/HANDOFF.md`, or `_memory/workstreams/checkout-flow/HANDOFF.md`.
 ---
 
 # Handoff Memory
 
 ## Overview
 
-Keep shared memory documents close to the work they describe. For a single repository, keep the canonical handoff in the repo. For a multi-repository workspace, keep cross-repo memory in the workspace root.
+Keep shared memory documents close to the work they describe. For a single repository, keep the canonical handoff in the repo. For a multi-repository workspace, keep workspace-wide memory in the workspace root and workstream-specific memory under dedicated workstream folders.
 
 This skill keeps one canonical handoff per scope and adds lightweight operational tooling:
 
@@ -23,6 +23,7 @@ Use this as the default flow unless the user already has a stronger convention:
 
 1. Resolve or initialize the canonical document.
    Run `scripts/create_handoff.py --project-root <path> --scope auto --document handoff --format json`.
+   Add `--workstream <name>` when the task belongs to one specific repo combination inside a larger workspace.
 
 2. Read the canonical document before changing it.
    Preserve still-valid context. Remove stale claims that would mislead the next session.
@@ -47,13 +48,18 @@ For day-to-day agent behavior, follow `references/agent-usage-best-practices.md`
 - In workspace scope, keep cross-repo memory under `_memory/`.
 - If no repo handoff exists, create `docs/HANDOFF.md`.
 - If no workspace handoff exists, create `_memory/HANDOFF.md`.
-- For workspace memory, use these defaults:
-  - `_memory/HANDOFF.md` for current cross-repo status
+- For workspace-wide memory, use these defaults:
+  - `_memory/HANDOFF.md` for workspace-wide summary and active workstream index
   - `_memory/WORKSPACE.md` for durable workspace structure
   - `_memory/DECISIONS.md` for cross-repo architecture or policy choices
   - `_memory/PATTERNS.md` for repeatable conventions
-- Most sessions should only update the canonical handoff. Touch the companion workspace documents only when durable shared context changed.
-- Optional snapshots live under `docs/handoffs/` for repos or `_memory/handoffs/` for workspaces.
+- For workstream-specific memory, use these defaults:
+  - `_memory/workstreams/<name>/HANDOFF.md`
+  - `_memory/workstreams/<name>/WORKSTREAM.md`
+  - `_memory/workstreams/<name>/DECISIONS.md`
+  - `_memory/workstreams/<name>/PATTERNS.md`
+- Most sessions should only update the canonical handoff for the active scope. Touch companion workspace or workstream documents only when durable shared context changed.
+- Optional snapshots live under `docs/handoffs/`, `_memory/handoffs/`, or `_memory/workstreams/<name>/handoffs/`.
 - Avoid `.codex`, `.claude`, `.windsurf`, or `.agents` as the default shared mutable handoff location.
 
 ## Scope Guidance
@@ -68,12 +74,22 @@ Use repo scope when the task belongs to one repository.
 
 ### Workspace Scope
 
-Use workspace scope when the agent session starts from a parent folder that coordinates multiple repositories and the task spans more than one of them.
+Use workspace scope when the agent session starts from a parent folder that coordinates multiple repositories and the task spans more than one of them at the workspace-wide level.
 
 - Canonical file: `_memory/HANDOFF.md`
 - Session snapshots: `_memory/handoffs/*.md`
-- Keep only cross-repo coordination and durable shared context here
+- Keep workspace-wide coordination and durable shared context here
 - Leave repo-specific implementation detail in each repo's own `docs/HANDOFF.md`
+
+### Workstream Scope
+
+Use workstream scope when the same workspace hosts multiple independent repo combinations and one handoff per workspace would blur them together.
+
+- Canonical file: `_memory/workstreams/<name>/HANDOFF.md`
+- Durable overview: `_memory/workstreams/<name>/WORKSTREAM.md`
+- Session snapshots: `_memory/workstreams/<name>/handoffs/*.md`
+- Keep only the repos relevant to that initiative in the workstream handoff
+- Prefer workstream names that describe the initiative, not just the repo list
 
 ## Content Rules
 
@@ -93,10 +109,12 @@ The canonical handoff is the shared source of truth. Optional session snapshots 
 
 - Canonical handoff:
   - repo: `docs/HANDOFF.md`
-  - workspace: `_memory/HANDOFF.md`
+  - workspace-wide: `_memory/HANDOFF.md`
+  - workstream: `_memory/workstreams/<name>/HANDOFF.md`
 - Snapshot archive:
   - repo: `docs/handoffs/*.md`
-  - workspace: `_memory/handoffs/*.md`
+  - workspace-wide: `_memory/handoffs/*.md`
+  - workstream: `_memory/workstreams/<name>/handoffs/*.md`
 
 This model keeps the current state easy to find while still allowing point-in-time captures when they are useful.
 
@@ -108,15 +126,16 @@ When asked to continue work from a prior session:
 2. Read the canonical handoff before planning or editing code.
 3. Run the staleness check if the document might be old.
 4. If working in workspace scope, read companion memory files only when they are directly relevant.
-5. Compare the document against the current repo or workspace state and call out drift.
-6. Continue the work.
-7. Refresh and validate the canonical handoff again before ending the session if anything material changed.
+5. If the task is only one initiative inside a larger workspace, resolve the workstream document instead of the workspace-wide handoff.
+6. Compare the document against the current repo, workstream, or workspace state and call out drift.
+7. Continue the work.
+8. Refresh and validate the canonical handoff again before ending the session if anything material changed.
 
 ## Scripts
 
 ### `scripts/resolve_handoff_path.py`
 
-Resolve the canonical repo-local or workspace-local memory path. Use `--scope repo|workspace|auto`, `--document handoff|workspace|decisions|patterns`, or `--handoff-path` to honor an explicit override. Use `--ensure` to create the file when it does not exist.
+Resolve the canonical repo-local, workspace-wide, or workstream-specific memory path. Use `--scope repo|workspace|auto`, `--document handoff|workspace|workstream|decisions|patterns`, `--workstream`, or `--handoff-path` to honor an explicit override. Use `--ensure` to create the file when it does not exist.
 
 ### `scripts/create_handoff.py`
 
@@ -138,7 +157,7 @@ Use this to understand the expected handoff structure and section intent.
 
 ### `references/workspace-memory-guide.md`
 
-Use this when the task spans multiple repositories and you need to decide whether the canonical workspace handoff is enough or whether a durable companion document should also change.
+Use this when the task spans multiple repositories and you need to decide whether the canonical workspace handoff is enough or whether the task needs a dedicated workstream.
 
 ### `references/agent-usage-best-practices.md`
 

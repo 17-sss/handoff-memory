@@ -82,9 +82,57 @@ Continue this project from the shared HANDOFF document. First verify the repo st
 - Last Updated:
 - Updated By:
 
+## Active Workstreams
+
+- Workstream:
+- Status:
+- Repositories:
+
+## Current Coordination State
+
+- What is stable:
+- What is in progress:
+- What needs handoff:
+
+## Shared Watch List
+
+- Issue:
+- Risk:
+- Owner:
+
+## Quick Reference
+
+- Key repositories:
+- Shared commands:
+- Dashboards / docs:
+
+## Next Actions
+
+1. Put the first coordination step here.
+2. Add the next step only if it is already justified by the current state.
+
+## Resume Prompt
+
+Continue this workspace from the shared HANDOFF document. First identify the active workstream, then verify the related workstream notes before editing.
+```
+
+## Workstream Handoff
+
+```md
+# HANDOFF
+
+## Metadata
+
+- Workspace:
+- Workstream:
+- Root:
+- Workstream Root:
+- Last Updated:
+- Updated By:
+
 ## TL;DR
 
-- Summarize the cross-repo situation in 2-3 bullets.
+- Summarize the workstream state in 2-3 bullets.
 
 ## Current Objective
 
@@ -135,9 +183,47 @@ Continue this project from the shared HANDOFF document. First verify the repo st
 
 - Verify each impacted repo still matches the notes.
 - Re-run the highest-signal shared check before editing further.
-- Confirm the first next action still matches the workspace state.
+- Confirm the first next action still matches the workstream state.
 
 ## Resume Prompt
 
-Continue this workspace from the shared HANDOFF document. First verify the involved repositories still match the notes, then complete the first unfinished next action.
+Continue this workstream from the shared HANDOFF document. First verify the involved repositories still match the notes, then complete the first unfinished next action.
+```
+
+## Workstream Overview
+
+```md
+# WORKSTREAM
+
+## Overview
+
+- Workstream:
+- Workspace Root:
+- Workstream Root:
+- Purpose:
+
+## Repositories
+
+- Repo:
+- Repo:
+
+## Shared Goal
+
+- Outcome:
+- Non-goals:
+
+## Ownership / Boundaries
+
+- Primary owner:
+- Repo boundaries:
+
+## Entry Points / Commands
+
+- Key paths:
+- Commands:
+
+## Notes
+
+- Constraints:
+- Coordination notes:
 ```

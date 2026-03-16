@@ -83,9 +83,54 @@ WORKSPACE_HANDOFF_TEMPLATE = """# HANDOFF
 - Last Updated:
 - Updated By:
 
+## Active Workstreams
+
+- Workstream:
+- Status:
+- Repositories:
+
+## Current Coordination State
+
+- What is stable:
+- What is in progress:
+- What needs handoff:
+
+## Shared Watch List
+
+- Issue:
+- Risk:
+- Owner:
+
+## Quick Reference
+
+- Key repositories:
+- Shared commands:
+- Dashboards / docs:
+
+## Next Actions
+
+1. Put the first coordination step here.
+2. Add the next step only if it is already justified by the current state.
+
+## Resume Prompt
+
+Continue this workspace from the shared HANDOFF document. First identify the active workstream, then verify the related workstream notes before editing.
+"""
+
+WORKSTREAM_HANDOFF_TEMPLATE = """# HANDOFF
+
+## Metadata
+
+- Workspace:
+- Workstream:
+- Root:
+- Workstream Root:
+- Last Updated:
+- Updated By:
+
 ## TL;DR
 
-- Summarize the cross-repo situation in 2-3 bullets.
+- Summarize the workstream state in 2-3 bullets.
 
 ## Current Objective
 
@@ -136,11 +181,11 @@ WORKSPACE_HANDOFF_TEMPLATE = """# HANDOFF
 
 - Verify each impacted repo still matches the notes.
 - Re-run the highest-signal shared check before editing further.
-- Confirm the first next action still matches the workspace state.
+- Confirm the first next action still matches the workstream state.
 
 ## Resume Prompt
 
-Continue this workspace from the shared HANDOFF document. First verify the involved repositories still match the notes, then complete the first unfinished next action.
+Continue this workstream from the shared HANDOFF document. First verify the involved repositories still match the notes, then complete the first unfinished next action.
 """
 
 WORKSPACE_OVERVIEW_TEMPLATE = """# WORKSPACE
@@ -175,7 +220,42 @@ WORKSPACE_OVERVIEW_TEMPLATE = """# WORKSPACE
 - Local assumptions:
 """
 
-WORKSPACE_DECISIONS_TEMPLATE = """# DECISIONS
+WORKSTREAM_OVERVIEW_TEMPLATE = """# WORKSTREAM
+
+## Overview
+
+- Workstream:
+- Workspace Root:
+- Workstream Root:
+- Purpose:
+
+## Repositories
+
+- Repo:
+- Repo:
+
+## Shared Goal
+
+- Outcome:
+- Non-goals:
+
+## Ownership / Boundaries
+
+- Primary owner:
+- Repo boundaries:
+
+## Entry Points / Commands
+
+- Key paths:
+- Commands:
+
+## Notes
+
+- Constraints:
+- Coordination notes:
+"""
+
+DECISIONS_TEMPLATE = """# DECISIONS
 
 ## Decision Log
 
@@ -188,7 +268,7 @@ WORKSPACE_DECISIONS_TEMPLATE = """# DECISIONS
 - Affected repositories:
 """
 
-WORKSPACE_PATTERNS_TEMPLATE = """# PATTERNS
+PATTERNS_TEMPLATE = """# PATTERNS
 
 ## Reusable Patterns
 
@@ -208,13 +288,21 @@ REPO_DOCUMENTS = {
 }
 
 WORKSPACE_ROOT = Path("_memory")
+WORKSTREAMS_ROOT = WORKSPACE_ROOT / "workstreams"
 SNAPSHOT_DIRNAME = "handoffs"
 WORKSPACE_DOCUMENTS = {
     "handoff": (Path("HANDOFF.md"), WORKSPACE_HANDOFF_TEMPLATE),
     "workspace": (Path("WORKSPACE.md"), WORKSPACE_OVERVIEW_TEMPLATE),
-    "decisions": (Path("DECISIONS.md"), WORKSPACE_DECISIONS_TEMPLATE),
-    "patterns": (Path("PATTERNS.md"), WORKSPACE_PATTERNS_TEMPLATE),
+    "decisions": (Path("DECISIONS.md"), DECISIONS_TEMPLATE),
+    "patterns": (Path("PATTERNS.md"), PATTERNS_TEMPLATE),
 }
+WORKSTREAM_DOCUMENTS = {
+    "handoff": (Path("HANDOFF.md"), WORKSTREAM_HANDOFF_TEMPLATE),
+    "workstream": (Path("WORKSTREAM.md"), WORKSTREAM_OVERVIEW_TEMPLATE),
+    "decisions": (Path("DECISIONS.md"), DECISIONS_TEMPLATE),
+    "patterns": (Path("PATTERNS.md"), PATTERNS_TEMPLATE),
+}
+DOCUMENT_CHOICES = ("handoff", "workspace", "workstream", "decisions", "patterns")
 
 SECTION_REQUIREMENTS = {
     ("repo", "handoff"): (
@@ -232,6 +320,24 @@ SECTION_REQUIREMENTS = {
     ),
     ("workspace", "handoff"): (
         "Metadata",
+        "Active Workstreams",
+        "Current Coordination State",
+        "Shared Watch List",
+        "Quick Reference",
+        "Next Actions",
+        "Resume Prompt",
+    ),
+    ("workspace", "workspace"): (
+        "Overview",
+        "Repositories",
+        "Shared Commands",
+        "Ownership / Boundaries",
+        "Environment Notes",
+    ),
+    ("workspace", "decisions"): ("Decision Log",),
+    ("workspace", "patterns"): ("Reusable Patterns",),
+    ("workstream", "handoff"): (
+        "Metadata",
         "TL;DR",
         "Current Objective",
         "Current State",
@@ -244,19 +350,23 @@ SECTION_REQUIREMENTS = {
         "Resume Checklist",
         "Resume Prompt",
     ),
-    ("workspace", "workspace"): (
+    ("workstream", "workstream"): (
         "Overview",
         "Repositories",
-        "Shared Commands",
+        "Shared Goal",
         "Ownership / Boundaries",
-        "Environment Notes",
+        "Entry Points / Commands",
+        "Notes",
     ),
-    ("workspace", "decisions"): ("Decision Log",),
-    ("workspace", "patterns"): ("Reusable Patterns",),
+    ("workstream", "decisions"): ("Decision Log",),
+    ("workstream", "patterns"): ("Reusable Patterns",),
 }
 
 _EMPTY_METADATA_RE = re.compile(r"^(\s*-\s+[^:]+:\s*)$")
-_REPO_SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+_WORKSTREAM_LINE_RE = re.compile(r"^- Workstream:\s*(.+?)\s*$", re.MULTILINE)
+_REPO_LINE_RE = re.compile(r"^- Repo:\s*(.+?)\s*$", re.MULTILINE)
+_INVOLVED_REPOS_RE = re.compile(r"^- Repositories involved:\s*(.+?)\s*$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -268,20 +378,37 @@ class Resolution:
     document: str
     handoff_path: Path
     resolution_source: str
+    workstream: str | None = None
+    workstream_slug: str | None = None
 
     @property
     def exists(self) -> bool:
         return self.handoff_path.exists()
 
+    @property
+    def target_scope(self) -> str:
+        if self.scope == "workspace" and self.workstream:
+            return "workstream"
+        return self.scope
+
+    @property
+    def workstream_root(self) -> Path | None:
+        if not self.workstream_slug:
+            return None
+        return (self.project_root / WORKSTREAMS_ROOT / self.workstream_slug).resolve()
+
     def to_payload(self) -> dict[str, object]:
         return {
             "project_root": str(self.project_root),
             "scope": self.scope,
+            "target_scope": self.target_scope,
             "detected_scope": self.detected_scope,
             "document": self.document,
             "handoff_path": str(self.handoff_path),
             "resolution_source": self.resolution_source,
             "exists": self.exists,
+            "workstream": self.workstream,
+            "workstream_slug": self.workstream_slug,
         }
 
 
@@ -310,6 +437,15 @@ def resolve_explicit_handoff_path(project_root: Path, handoff_path: str) -> Path
     if candidate.is_absolute():
         return candidate.resolve()
     return (project_root / candidate).resolve()
+
+
+def slugify(value: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
+    return slug or "handoff"
+
+
+def workstream_slug(value: str) -> str:
+    return slugify(value)
 
 
 def repository_children(project_root: Path) -> list[Path]:
@@ -342,9 +478,25 @@ def resolve_existing_repo_handoff_path(project_root: Path) -> tuple[Path, str]:
     return (project_root / default_path).resolve(), "default"
 
 
+def workstream_directory(project_root: Path, workstream_name: str) -> Path:
+    return (project_root / WORKSTREAMS_ROOT / workstream_slug(workstream_name)).resolve()
+
+
 def resolve_workspace_document_path(project_root: Path, document: str) -> tuple[Path, str]:
     relative_name, _ = WORKSPACE_DOCUMENTS[document]
     candidate = project_root / WORKSPACE_ROOT / relative_name
+    if candidate.exists():
+        return candidate.resolve(), "existing"
+    return candidate.resolve(), "default"
+
+
+def resolve_workstream_document_path(
+    project_root: Path,
+    workstream_name: str,
+    document: str,
+) -> tuple[Path, str]:
+    relative_name, _ = WORKSTREAM_DOCUMENTS[document]
+    candidate = workstream_directory(project_root, workstream_name) / relative_name
     if candidate.exists():
         return candidate.resolve(), "existing"
     return candidate.resolve(), "default"
@@ -355,6 +507,7 @@ def resolve_document(
     scope: str = "auto",
     document: str = "handoff",
     handoff_path: str | None = None,
+    workstream: str | None = None,
 ) -> Resolution:
     raw_project_root = raw_project_root.expanduser().resolve()
     detected_scope = detect_scope(raw_project_root)
@@ -365,13 +518,25 @@ def resolve_document(
         else raw_project_root
     )
 
-    if resolved_scope == "repo" and document != "handoff":
-        raise ValueError("Repo scope only supports the handoff document.")
+    if resolved_scope == "repo":
+        if workstream:
+            raise ValueError("Repo scope does not support --workstream.")
+        if document != "handoff":
+            raise ValueError("Repo scope only supports the handoff document.")
+
+    if resolved_scope == "workspace" and workstream and document == "workspace":
+        raise ValueError("Use --document workstream for workstream-scoped overview files.")
 
     if handoff_path:
         target = resolve_explicit_handoff_path(project_root, handoff_path)
         source = "explicit"
+    elif resolved_scope == "workspace" and workstream:
+        if document not in WORKSTREAM_DOCUMENTS:
+            raise ValueError(f"Document {document!r} does not support --workstream.")
+        target, source = resolve_workstream_document_path(project_root, workstream, document)
     elif resolved_scope == "workspace":
+        if document not in WORKSPACE_DOCUMENTS:
+            raise ValueError(f"Document {document!r} requires --workstream.")
         target, source = resolve_workspace_document_path(project_root, document)
     else:
         target, source = resolve_existing_repo_handoff_path(project_root)
@@ -384,13 +549,17 @@ def resolve_document(
         document=document,
         handoff_path=target,
         resolution_source=source,
+        workstream=workstream,
+        workstream_slug=workstream_slug(workstream) if workstream else None,
     )
 
 
-def initial_content_for(scope: str, document: str) -> str:
-    if scope == "workspace":
-        return WORKSPACE_DOCUMENTS[document][1]
-    return REPO_HANDOFF_TEMPLATE
+def initial_content_for(resolution: Resolution) -> str:
+    if resolution.target_scope == "repo":
+        return REPO_HANDOFF_TEMPLATE
+    if resolution.target_scope == "workspace":
+        return WORKSPACE_DOCUMENTS[resolution.document][1]
+    return WORKSTREAM_DOCUMENTS[resolution.document][1]
 
 
 def ensure_document(resolution: Resolution) -> bool:
@@ -398,7 +567,7 @@ def ensure_document(resolution: Resolution) -> bool:
     if resolution.handoff_path.exists():
         return False
     resolution.handoff_path.write_text(
-        initial_content_for(resolution.scope, resolution.document),
+        initial_content_for(resolution),
         encoding="utf-8",
     )
     return True
@@ -467,6 +636,53 @@ def replace_metadata_fields(text: str, replacements: dict[str, str]) -> str:
     return "\n".join(output) + suffix
 
 
+def extract_sections(text: str) -> list[str]:
+    return _SECTION_RE.findall(text)
+
+
+def section_bodies(text: str) -> dict[str, str]:
+    matches = list(_SECTION_RE.finditer(text))
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections[match.group(1).strip()] = text[start:end]
+    return sections
+
+
+def replace_section_body(text: str, section_name: str, body_lines: list[str]) -> str:
+    matches = list(_SECTION_RE.finditer(text))
+    for index, match in enumerate(matches):
+        if match.group(1).strip() != section_name:
+            continue
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        replacement = "\n\n" + "\n".join(body_lines).rstrip() + "\n"
+        return text[:start] + replacement + text[end:]
+    return text
+
+
+def replace_repositories_in_text(
+    text: str,
+    resolution: Resolution,
+    repositories: list[str] | None,
+) -> str:
+    if not repositories:
+        return text
+    if resolution.document in {"workspace", "workstream"}:
+        return replace_section_body(
+            text,
+            "Repositories",
+            [f"- Repo: {repo}" for repo in repositories],
+        )
+    if resolution.document == "handoff" and resolution.target_scope == "workstream":
+        return replace_metadata_fields(
+            text,
+            {"Repositories involved": ", ".join(repositories)},
+        )
+    return text
+
+
 def sync_metadata(
     text: str,
     resolution: Resolution,
@@ -475,7 +691,7 @@ def sync_metadata(
 ) -> str:
     timestamp = iso_timestamp(now)
     actor = updated_by or current_user()
-    if resolution.scope == "repo":
+    if resolution.target_scope == "repo":
         replacements = {
             "Project": resolution.project_root.name,
             "Project ID": project_identifier(resolution.project_root),
@@ -486,34 +702,46 @@ def sync_metadata(
         }
         return replace_metadata_fields(text, replacements)
 
+    if resolution.target_scope == "workspace":
+        if resolution.document == "handoff":
+            replacements = {
+                "Workspace": resolution.project_root.name,
+                "Root": str(resolution.project_root),
+                "Last Updated": timestamp,
+                "Updated By": actor,
+            }
+            return replace_metadata_fields(text, replacements)
+        if resolution.document == "workspace":
+            replacements = {
+                "Workspace": resolution.project_root.name,
+                "Root": str(resolution.project_root),
+            }
+            return replace_metadata_fields(text, replacements)
+        return text
+
+    replacements = {
+        "Workspace": resolution.project_root.name,
+        "Workstream": resolution.workstream or "",
+        "Root": str(resolution.project_root),
+        "Workstream Root": str(resolution.workstream_root) if resolution.workstream_root else "",
+    }
     if resolution.document == "handoff":
-        replacements = {
-            "Workspace": resolution.project_root.name,
-            "Root": str(resolution.project_root),
-            "Last Updated": timestamp,
-            "Updated By": actor,
-        }
-        return replace_metadata_fields(text, replacements)
-
-    if resolution.document == "workspace":
-        replacements = {
-            "Workspace": resolution.project_root.name,
-            "Root": str(resolution.project_root),
-        }
-        return replace_metadata_fields(text, replacements)
-
-    return text
+        replacements.update(
+            {
+                "Last Updated": timestamp,
+                "Updated By": actor,
+            }
+        )
+    return replace_metadata_fields(text, replacements)
 
 
 def snapshot_directory(resolution: Resolution) -> Path:
-    if resolution.scope == "workspace":
+    if resolution.target_scope == "repo":
+        return resolution.project_root / "docs" / SNAPSHOT_DIRNAME
+    if resolution.target_scope == "workspace":
         return resolution.project_root / WORKSPACE_ROOT / SNAPSHOT_DIRNAME
-    return resolution.project_root / "docs" / SNAPSHOT_DIRNAME
-
-
-def slugify(value: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
-    return slug or "handoff"
+    assert resolution.workstream_root is not None
+    return resolution.workstream_root / SNAPSHOT_DIRNAME
 
 
 def create_snapshot(
@@ -523,7 +751,7 @@ def create_snapshot(
     now: datetime | None = None,
 ) -> Path:
     timestamp = (now or datetime.now()).strftime("%Y-%m-%d-%H%M%S")
-    base_label = label or resolution.project_root.name
+    base_label = label or resolution.workstream or resolution.project_root.name
     snapshot_dir = snapshot_directory(resolution)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     candidate = snapshot_dir / f"{timestamp}-{slugify(base_label)}.md"
@@ -535,12 +763,8 @@ def create_snapshot(
     return candidate.resolve()
 
 
-def extract_sections(text: str) -> list[str]:
-    return _REPO_SECTION_RE.findall(text)
-
-
-def required_sections(scope: str, document: str) -> tuple[str, ...]:
-    return SECTION_REQUIREMENTS[(scope, document)]
+def required_sections(target_scope: str, document: str) -> tuple[str, ...]:
+    return SECTION_REQUIREMENTS[(target_scope, document)]
 
 
 def placeholder_lines(text: str) -> list[str]:
@@ -558,15 +782,26 @@ def placeholder_lines(text: str) -> list[str]:
         if stripped in {
             "- Summarize the current situation in 2-3 bullets.",
             "- Summarize the cross-repo situation in 2-3 bullets.",
+            "- Summarize the workstream state in 2-3 bullets.",
             "- State the immediate goal for the next session.",
             "- State the shared goal for the next session.",
-            "- Repo:",
-            "- Repo: Repo name",
+            "- Workstream:",
+            "- Status:",
+            "- Repositories:",
+            "- Issue:",
+            "- Risk:",
+            "- Owner:",
+            "- What is stable:",
+            "- What is in progress:",
+            "- What needs handoff:",
+            "- What is done:",
+            "- What still needs confirmation:",
+            "- Repositories involved:",
+            "- Cross-repo dependencies:",
+            "- Shared blockers:",
             "- Change:",
             "- Validation:",
             "- Impact:",
-            "- Issue:",
-            "- Risk:",
             "- Workaround:",
             "- Key files:",
             "- Commands:",
@@ -574,44 +809,46 @@ def placeholder_lines(text: str) -> list[str]:
             "- Key repositories:",
             "- Shared commands:",
             "- Dashboards / docs:",
-            "- What is done:",
-            "- What is in progress:",
-            "- What still needs confirmation:",
-            "- What is stable:",
-            "1. Put the first concrete next step here.",
+            "- Checks run:",
+            "- Results:",
+            "- Not run yet:",
+            "- Repo:",
+            "- Outcome:",
+            "- Non-goals:",
+            "- Primary owner:",
+            "- Repo boundaries:",
+            "- Key paths:",
+            "- Constraints:",
+            "- Coordination notes:",
             "1. Put the first coordination step here.",
-            "2. Add the second step only if it is already justified by the current state.",
+            "1. Put the first concrete next step here.",
             "2. Add the next step only if it is already justified by the current state.",
+            "2. Add the second step only if it is already justified by the current state.",
             "- Re-open the files most relevant to the active task.",
             "- Re-run the most relevant check before making more changes.",
             "- Confirm the first next action still matches the repo state.",
             "- Verify each impacted repo still matches the notes.",
             "- Re-run the highest-signal shared check before editing further.",
-            "- Confirm the first next action still matches the workspace state.",
+            "- Confirm the first next action still matches the workstream state.",
         }:
             placeholders.append(stripped)
     return placeholders
 
 
-def empty_sections(text: str, scope: str, document: str) -> list[str]:
-    required = required_sections(scope, document)
-    matches = list(_REPO_SECTION_RE.finditer(text))
-    sections: dict[str, str] = {}
-    for index, match in enumerate(matches):
-        start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        sections[match.group(1).strip()] = text[start:end].strip()
-
+def empty_sections(text: str, target_scope: str, document: str) -> list[str]:
+    required = required_sections(target_scope, document)
+    sections = section_bodies(text)
+    placeholders = set(placeholder_lines(text))
     empty: list[str] = []
     for name in required:
         body = sections.get(name, "")
-        if not body:
+        if not body.strip():
             empty.append(name)
             continue
         remaining_lines = [
             line.strip()
             for line in body.splitlines()
-            if line.strip() and line.strip() not in placeholder_lines(body)
+            if line.strip() and line.strip() not in placeholders
         ]
         if not remaining_lines:
             empty.append(name)
@@ -676,3 +913,78 @@ def repo_status(
         "dirty_paths_count": len(dirty),
         "latest_dirty_epoch": int(max(path.stat().st_mtime for path in dirty)) if dirty else None,
     }
+
+
+def repositories_from_overview_text(text: str) -> list[str]:
+    sections = section_bodies(text)
+    repo_section = sections.get("Repositories", "")
+    names = [match.group(1).strip() for match in _REPO_LINE_RE.finditer(repo_section)]
+    return [name for name in names if name and name.lower() != "repo"]
+
+
+def repositories_from_handoff_text(text: str) -> list[str]:
+    match = _INVOLVED_REPOS_RE.search(text)
+    if not match:
+        return []
+    raw = match.group(1).strip()
+    if not raw or raw.lower() == "repositories involved":
+        return []
+    parts = [part.strip() for part in raw.split(",")]
+    return [part for part in parts if part]
+
+
+def workspace_repository_map(project_root: Path) -> dict[str, Path]:
+    repos = repository_children(project_root)
+    mapping: dict[str, Path] = {}
+    for repo in repos:
+        mapping[repo.name.lower()] = repo
+        mapping[str(repo).lower()] = repo
+        mapping[str(repo.relative_to(project_root)).lower()] = repo
+    return mapping
+
+
+def match_workspace_repositories(project_root: Path, names: list[str]) -> list[Path]:
+    mapping = workspace_repository_map(project_root)
+    matched: list[Path] = []
+    for raw_name in names:
+        candidate = raw_name.strip()
+        if not candidate:
+            continue
+        path = mapping.get(candidate.lower())
+        if path is None:
+            path = mapping.get(Path(candidate).name.lower())
+        if path and path not in matched:
+            matched.append(path)
+    return matched
+
+
+def workstream_supporting_paths(project_root: Path, workstream_name: str) -> dict[str, Path]:
+    root = workstream_directory(project_root, workstream_name)
+    return {
+        "workstream": root / "WORKSTREAM.md",
+        "handoff": root / "HANDOFF.md",
+        "decisions": root / "DECISIONS.md",
+        "patterns": root / "PATTERNS.md",
+    }
+
+
+def infer_workstream_repositories(
+    project_root: Path,
+    workstream_name: str,
+) -> tuple[list[Path], str | None]:
+    paths = workstream_supporting_paths(project_root, workstream_name)
+    overview_path = paths["workstream"]
+    if overview_path.exists():
+        names = repositories_from_overview_text(overview_path.read_text(encoding="utf-8"))
+        matched = match_workspace_repositories(project_root, names)
+        if matched:
+            return matched, "workstream-overview"
+
+    handoff_path = paths["handoff"]
+    if handoff_path.exists():
+        names = repositories_from_handoff_text(handoff_path.read_text(encoding="utf-8"))
+        matched = match_workspace_repositories(project_root, names)
+        if matched:
+            return matched, "workstream-handoff"
+
+    return [], None

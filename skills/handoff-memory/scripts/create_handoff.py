@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Initialize or refresh the canonical handoff document."""
+"""Initialize or refresh the canonical handoff or memory document."""
 
 from __future__ import annotations
 
@@ -9,8 +9,10 @@ import sys
 from pathlib import Path
 
 from handoff_lib import (
+    DOCUMENT_CHOICES,
     create_snapshot,
     ensure_document,
+    replace_repositories_in_text,
     resolve_document,
     sync_metadata,
 )
@@ -18,7 +20,7 @@ from handoff_lib import (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create or refresh a canonical repo-local or workspace-local handoff document."
+        description="Create or refresh a canonical repo-local, workspace-wide, or workstream document."
     )
     parser.add_argument("--project-root", default=".", help="Repository or workspace root.")
     parser.add_argument(
@@ -29,9 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--document",
-        choices=("handoff", "workspace", "decisions", "patterns"),
+        choices=DOCUMENT_CHOICES,
         default="handoff",
-        help="Document type. Repo scope only supports handoff.",
+        help="Document type. Repo scope only supports handoff. Workstream-specific documents require --workstream.",
+    )
+    parser.add_argument(
+        "--workstream",
+        help="Optional workstream name for workspace tasks that should keep separate canonical documents under _memory/workstreams/<name>/.",
     )
     parser.add_argument(
         "--handoff-path",
@@ -49,6 +55,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--snapshot-label",
         help="Optional label used in the snapshot file name.",
+    )
+    parser.add_argument(
+        "--repository",
+        action="append",
+        default=[],
+        help="Workspace repository name to record in a workstream document. Repeat for multiple repositories.",
     )
     parser.add_argument(
         "--format",
@@ -69,6 +81,7 @@ def main() -> int:
             scope=args.scope,
             document=args.document,
             handoff_path=args.handoff_path,
+            workstream=args.workstream,
         )
     except ValueError as error:
         parser.error(str(error))
@@ -96,6 +109,11 @@ def main() -> int:
         resolution,
         updated_by=args.author,
     )
+    updated_text = replace_repositories_in_text(
+        updated_text,
+        resolution,
+        args.repository,
+    )
     changed = updated_text != previous_text
     resolution.handoff_path.write_text(updated_text, encoding="utf-8")
 
@@ -104,6 +122,7 @@ def main() -> int:
         "created": created,
         "updated": changed or created,
         "snapshot_path": str(snapshot_path) if snapshot_path else None,
+        "repositories": args.repository,
     }
 
     if args.format == "json":

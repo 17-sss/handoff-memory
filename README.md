@@ -6,7 +6,7 @@ A collection of reusable skills for AI coding agents. Skills are packaged instru
 
 ### handoff-memory
 
-Agent-neutral workflow for creating and maintaining shared repo-local or workspace-local HANDOFF and memory documents.
+Agent-neutral workflow for creating and maintaining shared repo-local, workspace-wide, or workstream-specific HANDOFF and memory documents.
 
 **Use when:**
 - Writing a project handoff before ending a session
@@ -18,6 +18,7 @@ Agent-neutral workflow for creating and maintaining shared repo-local or workspa
 **Behavior:**
 - Reuses an existing shared handoff file such as `docs/HANDOFF.md`, `memories/HANDOFF.md`, or `HANDOFF.md`
 - Defaults to `docs/HANDOFF.md` for a repo and `_memory/HANDOFF.md` for a workspace
+- Supports workstream-specific workspace documents under `_memory/workstreams/<name>/`
 - Adds helper scripts for create, validate, and staleness checks
 - Supports optional timestamped snapshots under `docs/handoffs/` or `_memory/handoffs/`
 - Supports global or project-local skill installation, while keeping the shared data inside the repository or workspace root
