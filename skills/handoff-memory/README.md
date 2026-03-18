@@ -28,6 +28,7 @@ Path resolution and validation still work outside Git, but freshness checks are 
 - Supports optional timestamped snapshots in `docs/handoffs/` or `_memory/handoffs/`
 - Keeps agent-specific files as references to the shared handoff, not as the primary mutable state
 - Narrows workspace stale checks to the active workstream or repo set named in `_memory/HANDOFF.md` before falling back to every child repository
+- Treats `Next Actions` and `Resume Prompt` as authoritative resume-time execution guidance unless the user or repo state clearly invalidates them
 
 ## Workflow Summary
 
@@ -38,6 +39,8 @@ Path resolution and validation still work outside Git, but freshness checks are 
 5. Check staleness with `scripts/check_staleness.py` when resuming older notes
 
 In mixed workspaces, `check_staleness.py` does not blindly scan every child repo by default. It first tries to infer the active workstream or active repo set from the workspace handoff. Use `--workspace-wide` only when you truly want the whole parent folder.
+
+On resume requests, the intended flow is: verify, then execute the first unfinished next action. Fresh exploration is fine only when the handoff is stale, ambiguous, contradicted by the repo, or the user explicitly asks to rethink the plan.
 
 ## Scope Model
 
@@ -96,6 +99,7 @@ The primary memory files should stay inside the repository or workspace root the
 If an agent is using this skill continuously, follow [agent-usage-best-practices.md](references/agent-usage-best-practices.md). The short version:
 
 - Start by resolving the canonical handoff and checking staleness
+- On resume, treat `Next Actions` and `Resume Prompt` as the default execution plan
 - Update only one canonical handoff per active scope
 - Use a workstream when one workspace hosts multiple independent repo combinations
 - Touch workspace or workstream companion files only when durable shared context changed

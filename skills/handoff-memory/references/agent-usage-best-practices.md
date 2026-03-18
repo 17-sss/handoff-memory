@@ -54,6 +54,16 @@ When resuming from a parent folder that contains multiple unrelated repositories
 - Ignore unrelated dirty repos unless the task actually touches them or the user asks for workspace-wide status.
 - Use `--workspace-wide` only when you intentionally want status for every child repository.
 
+### Resume Execution Priority
+
+When the user says "continue", "resume", or "pick up where we left off", treat the active handoff as an execution queue, not just as background notes.
+
+- Treat the first unfinished item in `Next Actions` as the default plan.
+- Treat `Resume Prompt` as the preferred continuation frame.
+- Verify the repo state before acting, but do not turn that verification into a redesign pass.
+- Reopen architecture or implementation shape only when the user explicitly asks for it, the repo contradicts the handoff, or the handoff is stale or ambiguous.
+- Use exploration to support execution of the next action, not to replace it with a new plan.
+
 ## During-Session Rules
 
 - Keep the canonical handoff current enough that another agent could resume within a minute
@@ -63,6 +73,7 @@ When resuming from a parent folder that contains multiple unrelated repositories
 - Keep workspace-wide coordination in the workspace handoff
 - Keep initiative-specific coordination in the matching workstream handoff
 - When a task deeply changes one repo and lightly affects others, update the repo handoff in detail and keep the workspace handoff at the coordination level
+- On resume, favor executing the first unfinished next action over reopening settled design questions
 
 ## End-of-Session Flow
 
@@ -144,6 +155,7 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 - Updating all workspace documents every session
 - Mixing unrelated repo combinations into one workspace handoff
 - Running workspace-wide stale checks from a parent folder when the handoff already narrows the active repositories
+- Reopening design decisions during resume even though the active handoff already names a concrete next step and implementation direction
 - Copying repo-level detail into `_memory/HANDOFF.md` when it does not affect coordination
 - Leaving template placeholders behind in a final handoff
 - Treating agent-specific folders as the primary mutable store
@@ -151,6 +163,7 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 ## Suggested Agent Prompts
 
 - "Resume from the canonical handoff, narrow validation to the active workstream or repo set, then call out any drift before editing."
+- "Resume from the canonical handoff, verify alignment, then execute the first unfinished next action without reopening settled design direction unless the repo or user request invalidates it."
 - "Write or refresh the repo handoff using the current code state, then validate it strictly."
 - "Update the workspace handoff only for cross-repo coordination and keep repo-specific detail in the repo handoffs."
 

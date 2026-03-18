@@ -8,6 +8,10 @@
     "should_trigger": true
   },
   {
+    "query": "Resume the last planned frontend task from the existing handoff and follow the first unfinished next action unless the repo state contradicts it.",
+    "should_trigger": true
+  },
+  {
     "query": "Please add a new button to the dashboard header and match the existing spacing.",
     "should_trigger": false
   },

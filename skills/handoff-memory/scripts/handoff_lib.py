@@ -60,7 +60,7 @@ REPO_HANDOFF_TEMPLATE = """# HANDOFF
 
 ## Next Actions
 
-1. Put the first concrete next step here.
+1. Put the first concrete step the next session should execute here, not a broad exploration topic.
 2. Add the second step only if it is already justified by the current state.
 
 ## Resume Checklist
@@ -71,7 +71,7 @@ REPO_HANDOFF_TEMPLATE = """# HANDOFF
 
 ## Resume Prompt
 
-Continue this project from the shared HANDOFF document. First verify the repo still matches the notes, then complete the first unfinished next action.
+Continue this project from the shared HANDOFF document. First verify the repo still matches the notes, then execute the first unfinished next action. Do not reopen already-settled design direction unless the user or current repo state invalidates it.
 """
 
 WORKSPACE_HANDOFF_TEMPLATE = """# HANDOFF
@@ -109,12 +109,12 @@ WORKSPACE_HANDOFF_TEMPLATE = """# HANDOFF
 
 ## Next Actions
 
-1. Put the first coordination step here.
+1. Put the first coordination step the next session should execute here, not a brainstorming prompt.
 2. Add the next step only if it is already justified by the current state.
 
 ## Resume Prompt
 
-Continue this workspace from the shared HANDOFF document. First identify the active workstream or active repo set, then verify only those related repositories before editing. Use a workspace-wide scan only when the task truly spans the whole workspace.
+Continue this workspace from the shared HANDOFF document. First identify the active workstream or active repo set, then verify only those related repositories before editing. After verification, execute the first unfinished next action instead of reopening already-settled direction unless the user or repo state invalidates it. Use a workspace-wide scan only when the task truly spans the whole workspace.
 """
 
 WORKSTREAM_HANDOFF_TEMPLATE = """# HANDOFF
@@ -174,7 +174,7 @@ WORKSTREAM_HANDOFF_TEMPLATE = """# HANDOFF
 
 ## Next Actions
 
-1. Put the first coordination step here.
+1. Put the first coordination step the next session should execute here, not a brainstorming prompt.
 2. Add the next step only if it is already justified by the current state.
 
 ## Resume Checklist
@@ -185,7 +185,7 @@ WORKSTREAM_HANDOFF_TEMPLATE = """# HANDOFF
 
 ## Resume Prompt
 
-Continue this workstream from the shared HANDOFF document. First verify the involved repositories still match the notes, then complete the first unfinished next action.
+Continue this workstream from the shared HANDOFF document. First verify the involved repositories still match the notes, then execute the first unfinished next action. Do not reopen already-settled design direction unless the user or current repo state invalidates it.
 """
 
 WORKSPACE_OVERVIEW_TEMPLATE = """# WORKSPACE

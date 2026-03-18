@@ -46,6 +46,8 @@ Use this as the default flow unless the user already has a stronger convention:
 
 In mixed multi-repo workspaces, do not treat the parent folder as automatically workspace-wide. When the active handoff or a dominant workstream already names the relevant repositories, let that narrower repo set drive resume-time validation. Use `--workspace-wide` only when the user explicitly wants status for every child repository.
 
+For resume-style requests such as "continue", "resume", or "pick up where we left off", treat `Next Actions` as the default execution queue and `Resume Prompt` as the default execution framing. Do not reopen design direction that the handoff already narrowed unless the user asks to rethink it or the current repo state clearly invalidates it.
+
 Use `--snapshot` with `create_handoff.py` only when the user wants a timestamped checkpoint that is worth preserving. Always pair it with `--snapshot-kind` and a short `--snapshot-reason`. Do not make snapshots the default shared state.
 
 For day-to-day agent behavior, follow `references/agent-usage-best-practices.md`.
@@ -133,13 +135,14 @@ When asked to continue work from a prior session:
 
 1. Resolve the canonical handoff path.
 2. Read the canonical handoff before planning or editing code.
-3. Run the staleness check if the document might be old.
-4. If working in workspace scope, read companion memory files only when they are directly relevant.
-5. If the task is only one initiative inside a larger workspace, resolve the workstream document instead of the workspace-wide handoff.
-6. In a parent folder with unrelated repositories, narrow validation to the active workstream or the repositories named in the handoff before falling back to a workspace-wide scan.
-7. Compare the document against the current repo, workstream, or workspace state and call out drift.
-8. Continue the work.
-9. Refresh and validate the canonical handoff again before ending the session if anything material changed.
+3. Treat the first unfinished item in `Next Actions` as the default plan, and treat `Resume Prompt` as the default continuation frame.
+4. Run the staleness check if the document might be old.
+5. If working in workspace scope, read companion memory files only when they are directly relevant.
+6. If the task is only one initiative inside a larger workspace, resolve the workstream document instead of the workspace-wide handoff.
+7. In a parent folder with unrelated repositories, narrow validation to the active workstream or the repositories named in the handoff before falling back to a workspace-wide scan.
+8. Compare the document against the current repo, workstream, or workspace state and call out drift.
+9. Execute the first unfinished next action. Explore only as needed to complete it, not to replace it with fresh design work.
+10. Refresh and validate the canonical handoff again before ending the session if anything material changed.
 
 ## Scripts
 
