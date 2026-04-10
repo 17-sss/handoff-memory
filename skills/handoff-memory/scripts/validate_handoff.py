@@ -12,7 +12,9 @@ from handoff_lib import (
     DOCUMENT_CHOICES,
     empty_sections,
     extract_sections,
+    foreign_absolute_paths,
     placeholder_lines,
+    resume_usable_blockers,
     required_sections,
     resolve_document,
 )
@@ -91,19 +93,35 @@ def main() -> int:
     missing = [name for name in required if name not in sections]
     placeholders = placeholder_lines(text)
     empty = empty_sections(text, resolution.target_scope, resolution.document)
+    resume_blockers = resume_usable_blockers(
+        text,
+        resolution.target_scope,
+        resolution.document,
+    )
     warnings: list[str] = []
     if len(text.splitlines()) > 220:
         warnings.append("Document is longer than 220 lines; consider tightening it.")
+    portability_paths = foreign_absolute_paths(text, resolution.project_root)
+    if portability_paths:
+        warnings.append(
+            "Found absolute paths outside the current project root. Prefer workspace-relative paths and repo names."
+        )
 
-    valid = not missing and (not args.strict or (not placeholders and not empty))
+    strict_template_conformance = not missing and not placeholders and not empty
+    resume_usable = not resume_blockers
+    valid = strict_template_conformance if args.strict else resume_usable
     payload = {
         **resolution.to_payload(),
         "valid": valid,
+        "resume_usable": resume_usable,
+        "strict_template_conformance": strict_template_conformance,
         "sections_found": sections,
         "required_sections": required,
         "missing_sections": missing,
         "empty_sections": empty,
         "placeholder_lines": placeholders,
+        "resume_blockers": resume_blockers,
+        "foreign_absolute_paths": portability_paths,
         "warnings": warnings,
     }
 
@@ -115,6 +133,12 @@ def main() -> int:
             print("Valid")
         else:
             print("Invalid")
+        if resume_usable and not strict_template_conformance:
+            print("Resume-usable, but not strict-template-conformant.")
+        if resume_blockers:
+            print("Resume blockers:")
+            for blocker in resume_blockers:
+                print(f"- {blocker}")
         if missing:
             print(f"Missing sections: {', '.join(missing)}")
         if empty:
@@ -123,6 +147,10 @@ def main() -> int:
             print("Placeholder lines:")
             for line in placeholders:
                 print(f"- {line}")
+        if portability_paths:
+            print("Foreign absolute paths:")
+            for path in portability_paths:
+                print(f"- {path}")
         for warning in warnings:
             print(f"Warning: {warning}")
 

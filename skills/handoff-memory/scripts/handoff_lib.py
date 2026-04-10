@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from dataclasses import dataclass
@@ -290,6 +291,7 @@ REPO_DOCUMENTS = {
 WORKSPACE_ROOT = Path("_memory")
 WORKSTREAMS_ROOT = WORKSPACE_ROOT / "workstreams"
 SNAPSHOT_DIRNAME = "handoffs"
+INDEX_FILENAME = "INDEX.json"
 SNAPSHOT_KINDS = (
     "handoff",
     "risk",
@@ -313,6 +315,21 @@ WORKSTREAM_DOCUMENTS = {
     "patterns": (Path("PATTERNS.md"), PATTERNS_TEMPLATE),
 }
 DOCUMENT_CHOICES = ("handoff", "workspace", "workstream", "decisions", "patterns")
+ACTIVE_WORKSTREAM_KEYWORDS = (
+    "active",
+    "current",
+    "in progress",
+    "ongoing",
+    "working",
+    "open",
+)
+CANONICAL_DOCUMENT_NAMES = {
+    "HANDOFF.md": "handoff",
+    "WORKSPACE.md": "workspace",
+    "WORKSTREAM.md": "workstream",
+    "DECISIONS.md": "decisions",
+    "PATTERNS.md": "patterns",
+}
 
 SECTION_REQUIREMENTS = {
     ("repo", "handoff"): (
@@ -371,6 +388,17 @@ SECTION_REQUIREMENTS = {
     ("workstream", "decisions"): ("Decision Log",),
     ("workstream", "patterns"): ("Reusable Patterns",),
 }
+USABILITY_SECTION_REQUIREMENTS = {
+    ("repo", "handoff"): ("Metadata",),
+    ("workspace", "handoff"): ("Metadata",),
+    ("workspace", "workspace"): ("Overview",),
+    ("workspace", "decisions"): ("Decision Log",),
+    ("workspace", "patterns"): ("Reusable Patterns",),
+    ("workstream", "handoff"): ("Metadata",),
+    ("workstream", "workstream"): ("Overview",),
+    ("workstream", "decisions"): ("Decision Log",),
+    ("workstream", "patterns"): ("Reusable Patterns",),
+}
 
 _EMPTY_METADATA_RE = re.compile(r"^(\s*-\s+[^:]+:\s*)$")
 _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
@@ -378,6 +406,7 @@ _WORKSTREAM_LINE_RE = re.compile(r"^- Workstream:\s*(.+?)\s*$", re.MULTILINE)
 _REPO_LINE_RE = re.compile(r"^- Repo:\s*(.+?)\s*$", re.MULTILINE)
 _INVOLVED_REPOS_RE = re.compile(r"^- Repositories involved:\s*(.+?)\s*$", re.MULTILINE)
 _KEY_REPOSITORIES_RE = re.compile(r"^- Key repositories:\s*(.+?)\s*$", re.MULTILINE)
+_ABSOLUTE_PATH_RE = re.compile(r"(?<![:\w])(\/(?:[A-Za-z0-9._~-]+\/)+[A-Za-z0-9._~-]+)")
 _PLACEHOLDER_VALUES = {
     "",
     "repo",
@@ -432,6 +461,39 @@ class Resolution:
         }
 
 
+@dataclass(frozen=True)
+class ResumeTarget:
+    base_resolution: Resolution
+    resolution: Resolution | None
+    selection_reason: str
+    ambiguous: bool = False
+    candidates: tuple[dict[str, object], ...] = ()
+    current_repository: str | None = None
+    last_active_workstream: str | None = None
+
+    def to_payload(self) -> dict[str, object]:
+        payload = self.base_resolution.to_payload()
+        payload.update(
+            {
+                "ambiguous": self.ambiguous,
+                "selection_reason": self.selection_reason,
+                "resume_target_path": str(self.resolution.handoff_path)
+                if self.resolution
+                else None,
+                "resume_target_scope": self.resolution.target_scope if self.resolution else None,
+                "resume_target_workstream": self.resolution.workstream
+                if self.resolution
+                else None,
+                "current_repository": self.current_repository,
+                "last_active_workstream": self.last_active_workstream,
+                "candidates": list(self.candidates),
+            }
+        )
+        if self.resolution:
+            payload["selected_resolution"] = self.resolution.to_payload()
+        return payload
+
+
 def run_git(project_root: Path, *args: str) -> str | None:
     try:
         result = subprocess.run(
@@ -457,6 +519,32 @@ def resolve_explicit_handoff_path(project_root: Path, handoff_path: str) -> Path
     if candidate.is_absolute():
         return candidate.resolve()
     return (project_root / candidate).resolve()
+
+
+def infer_document_from_path(path: Path) -> str | None:
+    return CANONICAL_DOCUMENT_NAMES.get(path.name)
+
+
+def infer_workspace_root_from_path(path: Path) -> Path | None:
+    parts = path.resolve().parts
+    matches = [index for index, part in enumerate(parts) if part == WORKSPACE_ROOT.name]
+    if not matches:
+        return None
+    index = matches[-1]
+    if index == 0:
+        return Path(path.anchor).resolve()
+    return Path(*parts[:index]).resolve()
+
+
+def infer_workstream_name_from_path(project_root: Path, path: Path) -> str | None:
+    try:
+        relative_path = path.resolve().relative_to((project_root / WORKSPACE_ROOT).resolve())
+    except ValueError:
+        return None
+    parts = relative_path.parts
+    if len(parts) >= 3 and parts[0] == "workstreams":
+        return parts[1]
+    return None
 
 
 def slugify(value: str) -> str:
@@ -487,6 +575,17 @@ def detect_scope(project_root: Path) -> str:
     if (project_root / WORKSPACE_ROOT).exists():
         return "workspace"
     return "repo"
+
+
+def detect_workspace_root(project_root: Path) -> Path:
+    project_root = project_root.resolve()
+    for candidate in (project_root, *project_root.parents):
+        if (candidate / WORKSPACE_ROOT).exists():
+            return candidate.resolve()
+    for candidate in (project_root, *project_root.parents):
+        if len(repository_children(candidate)) >= 2:
+            return candidate.resolve()
+    return project_root
 
 
 def resolve_existing_repo_handoff_path(project_root: Path) -> tuple[Path, str]:
@@ -530,34 +629,68 @@ def resolve_document(
     workstream: str | None = None,
 ) -> Resolution:
     raw_project_root = raw_project_root.expanduser().resolve()
-    detected_scope = detect_scope(raw_project_root)
-    resolved_scope = detected_scope if scope == "auto" else scope
-    project_root = (
-        canonical_project_root(raw_project_root)
-        if resolved_scope == "repo"
-        else raw_project_root
+    explicit_target = (
+        resolve_explicit_handoff_path(raw_project_root, handoff_path)
+        if handoff_path
+        else None
+    )
+    explicit_document = infer_document_from_path(explicit_target) if explicit_target else None
+    explicit_workspace_root = (
+        infer_workspace_root_from_path(explicit_target) if explicit_target else None
+    )
+    path_workstream = (
+        infer_workstream_name_from_path(explicit_workspace_root, explicit_target)
+        if explicit_target and explicit_workspace_root
+        else None
     )
 
+    if workstream and path_workstream and workstream_slug(workstream) != workstream_slug(path_workstream):
+        raise ValueError(
+            "--handoff-path and --workstream point to different workstreams."
+        )
+
+    inferred_workstream = workstream or path_workstream
+    inferred_document = explicit_document or document
+    detected_scope = detect_scope(raw_project_root)
+
+    if explicit_workspace_root:
+        project_root = explicit_workspace_root
+        resolved_scope = "workspace"
+    elif inferred_workstream:
+        project_root = detect_workspace_root(raw_project_root)
+        resolved_scope = "workspace"
+    else:
+        resolved_scope = detected_scope if scope == "auto" else scope
+        project_root = (
+            canonical_project_root(raw_project_root)
+            if resolved_scope == "repo"
+            else raw_project_root
+        )
+
     if resolved_scope == "repo":
-        if workstream:
+        if inferred_workstream:
             raise ValueError("Repo scope does not support --workstream.")
-        if document != "handoff":
+        if inferred_document != "handoff":
             raise ValueError("Repo scope only supports the handoff document.")
 
-    if resolved_scope == "workspace" and workstream and document == "workspace":
+    if resolved_scope == "workspace" and inferred_workstream and inferred_document == "workspace":
         raise ValueError("Use --document workstream for workstream-scoped overview files.")
 
-    if handoff_path:
-        target = resolve_explicit_handoff_path(project_root, handoff_path)
+    if explicit_target:
+        target = explicit_target
         source = "explicit"
-    elif resolved_scope == "workspace" and workstream:
-        if document not in WORKSTREAM_DOCUMENTS:
-            raise ValueError(f"Document {document!r} does not support --workstream.")
-        target, source = resolve_workstream_document_path(project_root, workstream, document)
+    elif resolved_scope == "workspace" and inferred_workstream:
+        if inferred_document not in WORKSTREAM_DOCUMENTS:
+            raise ValueError(f"Document {inferred_document!r} does not support --workstream.")
+        target, source = resolve_workstream_document_path(
+            project_root,
+            inferred_workstream,
+            inferred_document,
+        )
     elif resolved_scope == "workspace":
-        if document not in WORKSPACE_DOCUMENTS:
-            raise ValueError(f"Document {document!r} requires --workstream.")
-        target, source = resolve_workspace_document_path(project_root, document)
+        if inferred_document not in WORKSPACE_DOCUMENTS:
+            raise ValueError(f"Document {inferred_document!r} requires --workstream.")
+        target, source = resolve_workspace_document_path(project_root, inferred_document)
     else:
         target, source = resolve_existing_repo_handoff_path(project_root)
 
@@ -566,11 +699,11 @@ def resolve_document(
         project_root=project_root,
         scope=resolved_scope,
         detected_scope=detected_scope,
-        document=document,
+        document=inferred_document,
         handoff_path=target,
         resolution_source=source,
-        workstream=workstream,
-        workstream_slug=workstream_slug(workstream) if workstream else None,
+        workstream=inferred_workstream,
+        workstream_slug=workstream_slug(inferred_workstream) if inferred_workstream else None,
     )
 
 
@@ -639,6 +772,43 @@ def current_user() -> str:
 def iso_timestamp(now: datetime | None = None) -> str:
     current = now or datetime.now(timezone.utc).astimezone()
     return current.replace(microsecond=0).isoformat()
+
+
+def metadata_value(text: str, field: str) -> str | None:
+    prefix = f"- {field}:"
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith(prefix):
+            continue
+        value = line.split(":", 1)[1].strip()
+        return value or None
+    return None
+
+
+def parse_timestamp(value: str) -> datetime | None:
+    normalized = value.strip()
+    if not normalized:
+        return None
+    try:
+        return datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def document_timestamp_info(
+    path: Path,
+    text: str | None = None,
+) -> tuple[int | None, str | None, str]:
+    if not path.exists():
+        return None, None, "missing"
+    source_text = text if text is not None else path.read_text(encoding="utf-8")
+    last_updated = metadata_value(source_text, "Last Updated")
+    if last_updated:
+        parsed = parse_timestamp(last_updated)
+        if parsed is not None:
+            return int(parsed.timestamp()), last_updated, "metadata"
+    modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).astimezone()
+    return int(path.stat().st_mtime), modified.replace(microsecond=0).isoformat(), "mtime"
 
 
 def replace_metadata_fields(text: str, replacements: dict[str, str]) -> str:
@@ -773,14 +943,16 @@ def create_snapshot(
     repositories: list[str] | None = None,
     now: datetime | None = None,
 ) -> Path:
-    timestamp = (now or datetime.now()).strftime("%Y-%m-%d-%H%M%S")
+    timestamp = (now or datetime.now()).strftime("%Y%m%d_%H%M%S")
     base_label = label or resolution.workstream or resolution.project_root.name
     snapshot_dir = snapshot_directory(resolution)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     candidate = snapshot_dir / f"{timestamp}-{slugify(kind)}-{slugify(base_label)}.md"
     index = 1
     while candidate.exists():
-        candidate = snapshot_dir / f"{timestamp}-{slugify(kind)}-{slugify(base_label)}-{index}.md"
+        candidate = snapshot_dir / (
+            f"{timestamp}-{index}-{slugify(kind)}-{slugify(base_label)}.md"
+        )
         index += 1
     created_at = iso_timestamp(now)
     repo_text = ", ".join(repositories or []) or "n/a"
@@ -805,6 +977,10 @@ def create_snapshot(
 
 def required_sections(target_scope: str, document: str) -> tuple[str, ...]:
     return SECTION_REQUIREMENTS[(target_scope, document)]
+
+
+def usability_sections(target_scope: str, document: str) -> tuple[str, ...]:
+    return USABILITY_SECTION_REQUIREMENTS[(target_scope, document)]
 
 
 def placeholder_lines(text: str) -> list[str]:
@@ -893,6 +1069,45 @@ def empty_sections(text: str, target_scope: str, document: str) -> list[str]:
         if not remaining_lines:
             empty.append(name)
     return empty
+
+
+def resume_usable_blockers(text: str, target_scope: str, document: str) -> list[str]:
+    sections = section_bodies(text)
+    empty = set(empty_sections(text, target_scope, document))
+    blockers: list[str] = []
+
+    for name in usability_sections(target_scope, document):
+        if name not in sections:
+            blockers.append(f"Missing required section for resume use: {name}")
+        elif name in empty:
+            blockers.append(f"Required section is empty for resume use: {name}")
+
+    if document == "handoff":
+        continuity_sections = (
+            "Next Actions",
+            "Resume Prompt",
+            "Current Objective",
+            "Current Coordination State",
+            "TL;DR",
+        )
+        if not any(name in sections and name not in empty for name in continuity_sections):
+            blockers.append(
+                "Document does not contain a substantive Next Actions, Resume Prompt, TL;DR, or current-state section."
+            )
+
+    return blockers
+
+
+def foreign_absolute_paths(text: str, project_root: Path) -> list[str]:
+    project_root = project_root.resolve()
+    matches: set[str] = set()
+    for match in _ABSOLUTE_PATH_RE.finditer(text):
+        raw_path = match.group(1).rstrip(".,:;)]}")
+        resolved_path = Path(raw_path).expanduser().resolve(strict=False)
+        if resolved_path == project_root or project_root in resolved_path.parents:
+            continue
+        matches.add(raw_path)
+    return sorted(matches)
 
 
 def latest_commit_epoch(project_root: Path) -> int | None:
@@ -1022,11 +1237,13 @@ def infer_active_workspace_workstream(text: str) -> str | None:
     if not entries:
         return None
 
-    active_keywords = ("active", "in progress", "ongoing", "current", "working", "open")
     active = [
         str(entry["name"])
         for entry in entries
-        if any(keyword in str(entry["status"]).lower() for keyword in active_keywords)
+        if any(
+            keyword in str(entry["status"]).lower()
+            for keyword in ACTIVE_WORKSTREAM_KEYWORDS
+        )
     ]
     if len(active) == 1:
         return active[0]
@@ -1058,6 +1275,156 @@ def workspace_repository_map(project_root: Path) -> dict[str, Path]:
     return mapping
 
 
+def workspace_index_path(project_root: Path) -> Path:
+    return (project_root / WORKSPACE_ROOT / INDEX_FILENAME).resolve()
+
+
+def load_workspace_index(project_root: Path) -> dict[str, object]:
+    index_path = workspace_index_path(project_root)
+    if not index_path.exists():
+        return {
+            "path": str(index_path),
+            "last_active_workstream": None,
+            "workstreams": {},
+        }
+    try:
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        payload = {}
+
+    raw_workstreams = payload.get("workstreams", {})
+    if not isinstance(raw_workstreams, dict):
+        raw_workstreams = {}
+
+    workstreams: dict[str, dict[str, object]] = {}
+    for raw_name, raw_record in raw_workstreams.items():
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            continue
+        record = raw_record if isinstance(raw_record, dict) else {}
+        repositories = record.get("repositories", [])
+        if not isinstance(repositories, list):
+            repositories = []
+        workstreams[raw_name] = {
+            "canonical_path": str(
+                record.get("canonical_path")
+                or (workstream_directory(project_root, raw_name) / "HANDOFF.md").resolve()
+            ),
+            "last_updated": record.get("last_updated"),
+            "status": str(record.get("status") or "").strip(),
+            "repositories": [
+                str(repository).strip()
+                for repository in repositories
+                if str(repository).strip()
+            ],
+        }
+
+    return {
+        "path": str(index_path),
+        "last_active_workstream": payload.get("last_active_workstream"),
+        "workstreams": workstreams,
+    }
+
+
+def write_workspace_index(project_root: Path, payload: dict[str, object]) -> Path:
+    index_path = workspace_index_path(project_root)
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    normalized_payload = {
+        "last_active_workstream": payload.get("last_active_workstream"),
+        "workstreams": payload.get("workstreams", {}),
+    }
+    index_path.write_text(
+        json.dumps(normalized_payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return index_path
+
+
+def workstream_candidate_from_index(
+    project_root: Path,
+    workstream_name: str,
+    record: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "name": workstream_name,
+        "status": str(record.get("status") or "").strip(),
+        "repositories": list(record.get("repositories", [])),
+        "canonical_path": str(
+            record.get("canonical_path")
+            or (workstream_directory(project_root, workstream_name) / "HANDOFF.md").resolve()
+        ),
+        "last_updated": record.get("last_updated"),
+    }
+
+
+def workspace_workstream_candidates(project_root: Path) -> list[dict[str, object]]:
+    index_payload = load_workspace_index(project_root)
+    indexed = [
+        workstream_candidate_from_index(project_root, name, record)
+        for name, record in sorted(index_payload.get("workstreams", {}).items())
+    ]
+    if indexed:
+        return indexed
+
+    handoff_path = project_root / WORKSPACE_ROOT / "HANDOFF.md"
+    if not handoff_path.exists():
+        return []
+
+    text = handoff_path.read_text(encoding="utf-8")
+    return [
+        {
+            "name": str(entry["name"]),
+            "status": str(entry.get("status", "")).strip(),
+            "repositories": list(entry.get("repositories", [])),
+            "canonical_path": str(
+                (workstream_directory(project_root, str(entry["name"])) / "HANDOFF.md").resolve()
+            ),
+            "last_updated": None,
+        }
+        for entry in workspace_workstreams_from_handoff_text(text)
+    ]
+
+
+def current_workspace_repository(project_root: Path, cwd: Path | None = None) -> str | None:
+    current_path = (cwd or Path.cwd()).resolve()
+    repo_root = run_git(current_path, "rev-parse", "--show-toplevel")
+    if not repo_root:
+        return None
+    repo_path = Path(repo_root).resolve()
+    try:
+        repo_path.relative_to(project_root)
+    except ValueError:
+        return None
+    if repo_path == project_root:
+        return None
+    return repo_path.name
+
+
+def repository_name_matches(raw_name: str, repository_name: str) -> bool:
+    candidate = raw_name.strip().lower()
+    if not candidate:
+        return False
+    repository_name = repository_name.strip().lower()
+    return candidate == repository_name or Path(candidate).name.lower() == repository_name
+
+
+def infer_last_active_workstream_name(entries: list[dict[str, object]]) -> str | None:
+    return infer_active_workspace_workstream(
+        "\n".join(
+            ["## Active Workstreams"]
+            + [
+                "\n".join(
+                    [
+                        f"- Workstream: {entry['name']}",
+                        f"- Status: {entry.get('status', '')}",
+                        f"- Repositories: {', '.join(entry.get('repositories', []))}",
+                    ]
+                )
+                for entry in entries
+            ]
+        )
+    )
+
+
 def match_workspace_repositories(project_root: Path, names: list[str]) -> list[Path]:
     mapping = workspace_repository_map(project_root)
     matched: list[Path] = []
@@ -1087,14 +1454,15 @@ def infer_workstream_repositories(
     project_root: Path,
     workstream_name: str,
 ) -> tuple[list[Path], str | None]:
-    paths = workstream_supporting_paths(project_root, workstream_name)
-    overview_path = paths["workstream"]
-    if overview_path.exists():
-        names = repositories_from_overview_text(overview_path.read_text(encoding="utf-8"))
-        matched = match_workspace_repositories(project_root, names)
+    index_payload = load_workspace_index(project_root)
+    indexed_record = index_payload.get("workstreams", {}).get(workstream_name, {})
+    indexed_names = list(indexed_record.get("repositories", []))
+    if indexed_names:
+        matched = match_workspace_repositories(project_root, indexed_names)
         if matched:
-            return matched, "workstream-overview"
+            return matched, "index"
 
+    paths = workstream_supporting_paths(project_root, workstream_name)
     handoff_path = paths["handoff"]
     if handoff_path.exists():
         names = repositories_from_handoff_text(handoff_path.read_text(encoding="utf-8"))
@@ -1102,15 +1470,29 @@ def infer_workstream_repositories(
         if matched:
             return matched, "workstream-handoff"
 
+    overview_path = paths["workstream"]
+    if overview_path.exists():
+        names = repositories_from_overview_text(overview_path.read_text(encoding="utf-8"))
+        matched = match_workspace_repositories(project_root, names)
+        if matched:
+            return matched, "workstream-overview"
+
     return [], None
 
 
 def infer_workspace_repositories(
     project_root: Path,
 ) -> tuple[list[Path], str | None, str | None]:
+    index_payload = load_workspace_index(project_root)
+    last_active_workstream = index_payload.get("last_active_workstream")
+    if isinstance(last_active_workstream, str) and last_active_workstream:
+        matched, source = infer_workstream_repositories(project_root, last_active_workstream)
+        if matched:
+            return matched, source or "index-last-active-workstream", last_active_workstream
+
     handoff_path = project_root / WORKSPACE_ROOT / "HANDOFF.md"
     if not handoff_path.exists():
-        return [], None, None
+        return [], None, last_active_workstream if isinstance(last_active_workstream, str) else None
 
     text = handoff_path.read_text(encoding="utf-8")
     active_workstream = infer_active_workspace_workstream(text)
@@ -1145,4 +1527,224 @@ def infer_workspace_repositories(
         if matched:
             return matched, "workspace-single-workstream", str(entries[0]["name"])
 
-    return [], None, active_workstream
+    return [], None, active_workstream or (
+        last_active_workstream if isinstance(last_active_workstream, str) else None
+    )
+
+
+def sync_workspace_index(
+    resolution: Resolution,
+    text: str,
+) -> Path | None:
+    if resolution.scope != "workspace":
+        return None
+
+    index_payload = load_workspace_index(resolution.project_root)
+    workstreams = dict(index_payload.get("workstreams", {}))
+    last_active_workstream = index_payload.get("last_active_workstream")
+
+    if resolution.target_scope == "workstream" and resolution.workstream:
+        workstream_name = resolution.workstream
+        current_record = dict(workstreams.get(workstream_name, {}))
+        repositories: list[str] = []
+        if resolution.document == "handoff":
+            repositories = repositories_from_handoff_text(text)
+            _, last_updated, _ = document_timestamp_info(resolution.handoff_path, text)
+        elif resolution.document == "workstream":
+            repositories = repositories_from_overview_text(text)
+            handoff_path = workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md"
+            _, last_updated, _ = document_timestamp_info(
+                handoff_path if handoff_path.exists() else resolution.handoff_path,
+                text if resolution.handoff_path == handoff_path else None,
+            )
+        else:
+            handoff_path = workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md"
+            _, last_updated, _ = document_timestamp_info(handoff_path)
+
+        if repositories:
+            current_record["repositories"] = repositories
+        current_record["canonical_path"] = str(
+            (workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md").resolve()
+        )
+        current_record["last_updated"] = last_updated or current_record.get("last_updated")
+        current_record["status"] = str(current_record.get("status") or "").strip()
+        workstreams[workstream_name] = current_record
+        last_active_workstream = workstream_name
+
+    if resolution.target_scope == "workspace" and resolution.document == "handoff":
+        entries = workspace_workstreams_from_handoff_text(text)
+        for entry in entries:
+            workstream_name = str(entry["name"])
+            current_record = dict(workstreams.get(workstream_name, {}))
+            repositories = list(entry.get("repositories", []))
+            if repositories:
+                current_record["repositories"] = repositories
+            current_record["canonical_path"] = str(
+                (workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md").resolve()
+            )
+            current_record["status"] = str(entry.get("status") or "").strip()
+            if not current_record.get("last_updated"):
+                handoff_path = workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md"
+                _, last_updated, _ = document_timestamp_info(handoff_path)
+                current_record["last_updated"] = last_updated
+            workstreams[workstream_name] = current_record
+
+        inferred_last_active = infer_last_active_workstream_name(entries)
+        if inferred_last_active:
+            last_active_workstream = inferred_last_active
+
+    return write_workspace_index(
+        resolution.project_root,
+        {
+            "last_active_workstream": last_active_workstream,
+            "workstreams": workstreams,
+        },
+    )
+
+
+def resolve_resume_target(
+    raw_project_root: Path,
+    scope: str = "auto",
+    document: str = "handoff",
+    handoff_path: str | None = None,
+    workstream: str | None = None,
+    cwd: Path | None = None,
+) -> ResumeTarget:
+    base_resolution = resolve_document(
+        raw_project_root,
+        scope=scope,
+        document=document,
+        handoff_path=handoff_path,
+        workstream=workstream,
+    )
+    if handoff_path:
+        return ResumeTarget(
+            base_resolution=base_resolution,
+            resolution=base_resolution,
+            selection_reason="explicit-handoff-path",
+        )
+    if workstream:
+        return ResumeTarget(
+            base_resolution=base_resolution,
+            resolution=base_resolution,
+            selection_reason="explicit-workstream",
+        )
+    if base_resolution.document != "handoff" or base_resolution.target_scope != "workspace":
+        return ResumeTarget(
+            base_resolution=base_resolution,
+            resolution=base_resolution,
+            selection_reason="direct-resolution",
+        )
+
+    index_payload = load_workspace_index(base_resolution.project_root)
+    current_repository = current_workspace_repository(base_resolution.project_root, cwd=cwd)
+    candidates = workspace_workstream_candidates(base_resolution.project_root)
+    if not candidates:
+        return ResumeTarget(
+            base_resolution=base_resolution,
+            resolution=base_resolution,
+            selection_reason="workspace-handoff",
+            current_repository=current_repository,
+            last_active_workstream=index_payload.get("last_active_workstream"),
+        )
+
+    narrowed_candidates = candidates
+    if current_repository:
+        overlap = [
+            candidate
+            for candidate in narrowed_candidates
+            if any(
+                repository_name_matches(repository, current_repository)
+                for repository in candidate.get("repositories", [])
+            )
+        ]
+        if len(overlap) == 1:
+            selected = resolve_document(
+                base_resolution.project_root,
+                scope="workspace",
+                document="handoff",
+                workstream=str(overlap[0]["name"]),
+            )
+            return ResumeTarget(
+                base_resolution=base_resolution,
+                resolution=selected,
+                selection_reason="cwd-repo-overlap",
+                candidates=tuple(overlap),
+                current_repository=current_repository,
+                last_active_workstream=index_payload.get("last_active_workstream"),
+            )
+        if overlap:
+            narrowed_candidates = overlap
+
+    if len(narrowed_candidates) == 1:
+        selected = resolve_document(
+            base_resolution.project_root,
+            scope="workspace",
+            document="handoff",
+            workstream=str(narrowed_candidates[0]["name"]),
+        )
+        return ResumeTarget(
+            base_resolution=base_resolution,
+            resolution=selected,
+            selection_reason="single-workstream-candidate",
+            candidates=tuple(narrowed_candidates),
+            current_repository=current_repository,
+            last_active_workstream=index_payload.get("last_active_workstream"),
+        )
+
+    last_active_workstream = index_payload.get("last_active_workstream")
+    if isinstance(last_active_workstream, str) and last_active_workstream:
+        for candidate in narrowed_candidates:
+            if candidate["name"] == last_active_workstream:
+                selected = resolve_document(
+                    base_resolution.project_root,
+                    scope="workspace",
+                    document="handoff",
+                    workstream=last_active_workstream,
+                )
+                return ResumeTarget(
+                    base_resolution=base_resolution,
+                    resolution=selected,
+                    selection_reason="index-last-active-workstream",
+                    candidates=tuple(narrowed_candidates),
+                    current_repository=current_repository,
+                    last_active_workstream=last_active_workstream,
+                )
+
+    current_candidates = [
+        candidate
+        for candidate in narrowed_candidates
+        if any(
+            keyword in str(candidate.get("status", "")).lower()
+            for keyword in ACTIVE_WORKSTREAM_KEYWORDS
+        )
+    ]
+    if len(current_candidates) == 1:
+        selected = resolve_document(
+            base_resolution.project_root,
+            scope="workspace",
+            document="handoff",
+            workstream=str(current_candidates[0]["name"]),
+        )
+        return ResumeTarget(
+            base_resolution=base_resolution,
+            resolution=selected,
+            selection_reason="unique-current-workstream",
+            candidates=tuple(narrowed_candidates),
+            current_repository=current_repository,
+            last_active_workstream=last_active_workstream
+            if isinstance(last_active_workstream, str)
+            else None,
+        )
+
+    return ResumeTarget(
+        base_resolution=base_resolution,
+        resolution=None,
+        selection_reason="ambiguous-workstream",
+        ambiguous=True,
+        candidates=tuple(narrowed_candidates),
+        current_repository=current_repository,
+        last_active_workstream=last_active_workstream
+        if isinstance(last_active_workstream, str)
+        else None,
+    )

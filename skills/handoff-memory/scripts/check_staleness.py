@@ -11,12 +11,13 @@ from pathlib import Path
 
 from handoff_lib import (
     DOCUMENT_CHOICES,
+    document_timestamp_info,
     infer_workspace_repositories,
     infer_workstream_repositories,
     match_workspace_repositories,
     repo_status,
     repository_children,
-    resolve_document,
+    resolve_resume_target,
     snapshot_directory,
 )
 
@@ -82,8 +83,7 @@ def summarize_scope_status(
 ) -> list[dict[str, object]]:
     ignore_paths = {resolution.handoff_path, snapshot_directory(resolution)}
     if resolution.target_scope == "workspace":
-        repos = repositories or repository_children(resolution.project_root)
-        return [repo_status(repo_root) for repo_root in repos]
+        return [repo_status(repo_root) for repo_root in repositories]
     if resolution.target_scope == "workstream":
         return [repo_status(repo_root) for repo_root in repositories]
     return [repo_status(resolution.project_root, ignore_paths=ignore_paths)]
@@ -99,7 +99,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        resolution = resolve_document(
+        resume_target = resolve_resume_target(
             Path(args.project_root),
             scope=args.scope,
             document=args.document,
@@ -108,6 +108,27 @@ def main() -> int:
         )
     except ValueError as error:
         parser.error(str(error))
+
+    if resume_target.ambiguous or resume_target.resolution is None:
+        payload = {
+            **resume_target.to_payload(),
+            "stale": None,
+            "reasons": ["Resume target is ambiguous. Pass --handoff-path or --workstream."],
+            "warnings": [],
+        }
+        if args.format == "json":
+            json.dump(payload, sys.stdout, indent=2)
+            sys.stdout.write("\n")
+        else:
+            print("Ambiguous")
+            print("- Resume target is ambiguous. Pass --handoff-path or --workstream.")
+            for candidate in payload.get("candidates", []):
+                print(
+                    f"- Candidate: {candidate['name']} | status={candidate.get('status', '') or 'unknown'} | repos={', '.join(candidate.get('repositories', [])) or 'n/a'}"
+                )
+        return 2
+
+    resolution = resume_target.resolution
 
     default_age = 24.0 if resolution.scope == "workspace" else 72.0
     max_age_hours = args.max_age_hours if args.max_age_hours is not None else default_age
@@ -127,7 +148,13 @@ def main() -> int:
             print("Stale: document does not exist.")
         return 1 if args.fail_if_stale else 0
 
-    handoff_epoch = resolution.handoff_path.stat().st_mtime
+    handoff_text = resolution.handoff_path.read_text(encoding="utf-8")
+    handoff_epoch, handoff_last_updated, handoff_timestamp_source = document_timestamp_info(
+        resolution.handoff_path,
+        handoff_text,
+    )
+    if handoff_epoch is None:
+        handoff_epoch = int(resolution.handoff_path.stat().st_mtime)
     now_epoch = datetime.now(timezone.utc).timestamp()
     age_hours = round((now_epoch - handoff_epoch) / 3600, 2)
 
@@ -138,7 +165,7 @@ def main() -> int:
 
     selected_repositories: list[Path] = []
     repo_selection_source: str | None = None
-    inferred_workstream: str | None = None
+    inferred_workstream: str | None = resolution.workstream
     if args.workspace_wide and resolution.target_scope != "workspace":
         parser.error("--workspace-wide only applies to workspace-scope checks.")
 
@@ -150,6 +177,7 @@ def main() -> int:
             )
             repo_selection_source = "cli"
         elif args.workspace_wide:
+            selected_repositories = repository_children(resolution.project_root)
             repo_selection_source = "workspace-wide"
         else:
             (
@@ -159,7 +187,7 @@ def main() -> int:
             ) = infer_workspace_repositories(resolution.project_root)
             if not selected_repositories:
                 warnings.append(
-                    "Could not infer an active workspace repo set from the handoff; falling back to every child repository."
+                    "Could not determine an active workspace repo set from the selected handoff or index; repo activity checks were skipped."
                 )
 
     if resolution.target_scope == "workstream":
@@ -192,9 +220,12 @@ def main() -> int:
 
     payload = {
         **resolution.to_payload(),
+        **resume_target.to_payload(),
         "stale": bool(reasons),
         "age_hours": age_hours,
         "max_age_hours": max_age_hours,
+        "handoff_last_updated": handoff_last_updated,
+        "handoff_timestamp_source": handoff_timestamp_source,
         "latest_commit_epoch": latest_commit,
         "latest_dirty_epoch": latest_dirty,
         "dirty_repositories": dirty_repos,

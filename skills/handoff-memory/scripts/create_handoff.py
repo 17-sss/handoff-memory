@@ -16,6 +16,7 @@ from handoff_lib import (
     infer_workstream_repositories,
     replace_repositories_in_text,
     resolve_document,
+    sync_workspace_index,
     sync_metadata,
 )
 
@@ -147,6 +148,7 @@ def main() -> int:
     )
     changed = updated_text != previous_text
     resolution.handoff_path.write_text(updated_text, encoding="utf-8")
+    index_path = sync_workspace_index(resolution, updated_text)
 
     payload = {
         **resolution.to_payload(),
@@ -157,6 +159,7 @@ def main() -> int:
         "snapshot_reason": args.snapshot_reason,
         "repositories": args.repository,
         "snapshot_repositories": snapshot_repositories,
+        "index_path": str(index_path) if index_path else None,
     }
 
     if args.format == "json":

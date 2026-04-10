@@ -8,7 +8,12 @@ import json
 import sys
 from pathlib import Path
 
-from handoff_lib import DOCUMENT_CHOICES, ensure_document, resolve_document
+from handoff_lib import (
+    DOCUMENT_CHOICES,
+    ensure_document,
+    resolve_document,
+    resolve_resume_target,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -46,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Create the file when missing.",
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resolve the resume target instead of the generic canonical path. In workspace scope this may select a workstream handoff or return an ambiguous result.",
+    )
+    parser.add_argument(
         "--format",
         choices=("text", "json"),
         default="text",
@@ -59,27 +69,47 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        resolution = resolve_document(
-            Path(args.project_root),
-            scope=args.scope,
-            document=args.document,
-            handoff_path=args.handoff_path,
-            workstream=args.workstream,
-        )
+        if args.resume:
+            resume_target = resolve_resume_target(
+                Path(args.project_root),
+                scope=args.scope,
+                document=args.document,
+                handoff_path=args.handoff_path,
+                workstream=args.workstream,
+            )
+            resolution = resume_target.resolution
+            payload = resume_target.to_payload()
+        else:
+            resolution = resolve_document(
+                Path(args.project_root),
+                scope=args.scope,
+                document=args.document,
+                handoff_path=args.handoff_path,
+                workstream=args.workstream,
+            )
+            payload = resolution.to_payload()
     except ValueError as error:
         parser.error(str(error))
 
     if args.ensure:
+        if args.resume and resolution is None:
+            parser.error("Cannot --ensure an ambiguous resume target. Pass --handoff-path or --workstream.")
         ensure_document(resolution)
 
-    payload = resolution.to_payload()
     if args.format == "json":
         json.dump(payload, sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
-        print(resolution.handoff_path)
+        if args.resume and resolution is None:
+            print("Ambiguous")
+            for candidate in payload.get("candidates", []):
+                print(
+                    f"- {candidate['name']}: status={candidate.get('status', '') or 'unknown'} repos={', '.join(candidate.get('repositories', [])) or 'n/a'}"
+                )
+        else:
+            print(resolution.handoff_path)
 
-    return 0
+    return 2 if args.resume and resolution is None else 0
 
 
 if __name__ == "__main__":
