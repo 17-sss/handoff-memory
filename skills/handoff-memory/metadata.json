@@ -1,9 +1,9 @@
 {
   "name": "handoff-memory",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "organization": "17-sss",
-  "date": "March 2026",
-  "abstract": "Agent-neutral workflow for creating, refreshing, validating, and resuming shared handoff and memory documents for a single repository, a workspace-wide cross-repo context, or a specific workstream inside a larger workspace. Designed to preserve current state in canonical Git-trackable files while optionally keeping timestamped session snapshots with explicit kind and reason metadata.",
+  "date": "April 2026",
+  "abstract": "Agent-neutral workflow for creating, refreshing, validating, and resuming shared handoff and memory documents for a single repository, a workspace-wide cross-repo context, or a specific workstream inside a larger workspace. Preserves canonical Git-trackable files, maintains a lightweight workspace index for resume targeting, prefers explicit and repo-overlap signals over branch-based guessing, and keeps timestamped snapshots as optional archives rather than primary state.",
   "references": [
     "https://skills.sh/softaworks/agent-toolkit/session-handoff",
     "https://skills.sh/wshobson/agents/on-call-handoff-patterns"

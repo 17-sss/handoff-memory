@@ -74,6 +74,8 @@ python3 scripts/create_handoff.py \
 - Use `--snapshot-label` only when the default project or workstream name is too vague
 - Prefer initiative names such as `checkout-flow` or `asset-delivery`
 - Keep labels short and stable enough to scan later
+- Snapshot filenames should use `YYYYMMDD_HHMMSS[-n]-<kind>-<label>.md`
+- Keep canonical files unprefixed. Timestamp prefixes belong only in snapshot archives.
 
 ## Snapshot Content
 

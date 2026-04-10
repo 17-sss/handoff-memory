@@ -21,10 +21,10 @@ Prefer one canonical handoff per active scope.
    - Parent folder coordinating one shared cross-repo effort: workspace-wide scope
    - Parent folder with multiple independent repo combinations: workstream scope
 
-2. Resolve the canonical document first.
+2. Resolve the resume target first when resuming.
 
 ```bash
-python3 scripts/resolve_handoff_path.py --project-root <path> --scope auto --document handoff --format json
+python3 scripts/resolve_handoff_path.py --project-root <path> --scope auto --document handoff --resume --format json
 ```
 
 3. Check whether the document is stale before trusting it.
@@ -33,7 +33,7 @@ python3 scripts/resolve_handoff_path.py --project-root <path> --scope auto --doc
 python3 scripts/check_staleness.py --project-root <path> --scope auto --document handoff --format json
 ```
 
-In mixed multi-repo workspaces, do not assume `workspace root` means `scan every child repo`. If `_memory/HANDOFF.md` or the dominant workstream already names the active repositories, treat that narrower repo set as authoritative for resume-time validation.
+In mixed multi-repo workspaces, do not assume `workspace root` means `scan every child repo`. Resume targeting should prefer explicit overrides, then current repo overlap, then `_memory/INDEX.json`, then a unique current workstream. If none of those produce a single target, stop on ambiguity instead of guessing.
 
 4. Read the canonical handoff before planning, searching, or editing.
 
@@ -53,6 +53,7 @@ When resuming from a parent folder that contains multiple unrelated repositories
 - If `_memory/HANDOFF.md` clearly names the active repositories, treat them as authoritative for the current session.
 - Ignore unrelated dirty repos unless the task actually touches them or the user asks for workspace-wide status.
 - Use `--workspace-wide` only when you intentionally want status for every child repository.
+- Do not use branch as the main restore selector.
 
 ### Resume Execution Priority
 
@@ -68,7 +69,7 @@ When the user says "continue", "resume", or "pick up where we left off", treat t
 
 - Keep the canonical handoff current enough that another agent could resume within a minute
 - Keep `TL;DR`, `Current Objective`, and `Next Actions` especially fresh
-- Prefer exact paths, commands, and repo names
+- Prefer workspace-relative paths, commands, and repo names
 - Keep implementation detail in repo handoffs, not in the workspace handoff
 - Keep workspace-wide coordination in the workspace handoff
 - Keep initiative-specific coordination in the matching workstream handoff
@@ -112,8 +113,10 @@ Snapshot kinds:
 3. Validate before you stop.
 
 ```bash
-python3 scripts/validate_handoff.py --project-root <path> --scope auto --document handoff --strict
+python3 scripts/validate_handoff.py --project-root <path> --scope auto --document handoff
 ```
+
+Use `--strict` only when strict template conformance should fail the session close-out.
 
 4. If the task touched multiple repos, also update the affected repo-local handoffs.
 
@@ -155,6 +158,7 @@ python3 scripts/validate_handoff.py --project-root <path> --scope auto --documen
 - Updating all workspace documents every session
 - Mixing unrelated repo combinations into one workspace handoff
 - Running workspace-wide stale checks from a parent folder when the handoff already narrows the active repositories
+- Leaving old machine-specific absolute paths in the handoff when a workspace-relative path would work
 - Reopening design decisions during resume even though the active handoff already names a concrete next step and implementation direction
 - Copying repo-level detail into `_memory/HANDOFF.md` when it does not affect coordination
 - Leaving template placeholders behind in a final handoff

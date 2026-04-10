@@ -2,6 +2,13 @@
 
 Use one canonical handoff per scope. Optional timestamped snapshots are secondary archives, not the primary shared state.
 
+## Path Style
+
+- Keep canonical filenames stable: `HANDOFF.md`, `WORKSTREAM.md`, `WORKSPACE.md`, `DECISIONS.md`, and `PATTERNS.md` should not get timestamp prefixes.
+- Use workspace-relative paths and repo names in the body whenever possible, for example `frontend/src/app.tsx` or `backend:services/payments.py`.
+- Avoid machine-specific absolute paths such as `/Users/...` or old workstation roots unless they are genuinely required.
+- Reserve timestamped naming for snapshot archives only, using `YYYYMMDD_HHMMSS[-n]-<kind>-<label>.md`.
+
 ## Repo Handoff
 
 ```md

@@ -22,6 +22,14 @@ Only update the other workspace or workstream documents when durable shared cont
 - `_memory/workstreams/<name>/PATTERNS.md` when a convention is specific to one workstream
 - `_memory/handoffs/*.md` only when you explicitly want a timestamped session snapshot
 
+Also maintain `_memory/INDEX.json` as the lightweight machine-readable companion to the canonical files. It should track at least:
+
+- `last_active_workstream`
+- each workstream's `canonical_path`
+- each workstream's `last_updated`
+- each workstream's `status`
+- each workstream's `repositories`
+
 ## Recommended Files
 
 - `_memory/HANDOFF.md`
@@ -79,8 +87,16 @@ Only update the other workspace or workstream documents when durable shared cont
 When resuming from a workspace root:
 
 - Prefer the matching workstream handoff when one initiative dominates the task
-- If `_memory/HANDOFF.md` clearly names the active repositories, use that narrower repo set for staleness checks
-- Fall back to a workspace-wide scan only when the user explicitly asks for parent-folder-wide status or the active repo set cannot be inferred reliably
+- Resolve the target in this order:
+  - explicit `--handoff-path`
+  - explicit `--workstream`
+  - current repo overlap
+  - `_memory/INDEX.json` `last_active_workstream`
+  - unique current or in-progress workstream
+  - otherwise ambiguous, not guessed
+- If the selected handoff clearly names the active repositories, use that narrower repo set for staleness checks
+- Do not use branch as the primary restore signal
+- Fall back to a workspace-wide scan only when the user explicitly asks for parent-folder-wide status with `--workspace-wide`
 
 ## Relationship to Repo-Level Handoffs
 
@@ -88,3 +104,4 @@ When resuming from a workspace root:
 - Keep workspace-wide coordination at the workspace level
 - Keep initiative-specific cross-repo coordination in workstream documents
 - Avoid duplicating detailed repo-level notes in workspace memory unless they affect coordination
+- Workstream repo inference should still work when `WORKSTREAM.md` is missing, using `HANDOFF.md` alone when necessary

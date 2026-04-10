@@ -5,7 +5,7 @@ Agent-neutral workflow for maintaining shared handoff and memory documents for a
 ## Requirements
 
 - `python3` in `PATH` for the bundled scripts
-- `git` in `PATH` for branch metadata and staleness checks
+- `git` in `PATH` for repo metadata and staleness checks
 - A writable repository or workspace folder where the shared documents live
 
 Path resolution and validation still work outside Git, but freshness checks are most useful when the target lives in a Git repo or multi-repo workspace.
@@ -24,11 +24,13 @@ Path resolution and validation still work outside Git, but freshness checks are 
 - Reuses an existing repo handoff at `docs/HANDOFF.md`, `memories/HANDOFF.md`, or `HANDOFF.md`
 - Defaults to `docs/HANDOFF.md` for a repo and `_memory/HANDOFF.md` for a workspace
 - Supports workstream-specific handoffs and memory under `_memory/workstreams/<name>/`
+- Maintains a lightweight `_memory/INDEX.json` for workspace resume targeting
 - Adds lightweight operational tooling for `create`, `validate`, and `check_staleness`
 - Supports optional timestamped snapshots in `docs/handoffs/` or `_memory/handoffs/`
 - Keeps agent-specific files as references to the shared handoff, not as the primary mutable state
-- Narrows workspace stale checks to the active workstream or repo set named in `_memory/HANDOFF.md` before falling back to every child repository
+- Narrows workspace stale checks to the selected workstream or repo set named in the selected handoff instead of falling back to unrelated child repos
 - Treats `Next Actions` and `Resume Prompt` as authoritative resume-time execution guidance unless the user or repo state clearly invalidates them
+- Returns an ambiguous result instead of guessing when multiple workstreams still match a resume request
 
 ## Workflow Summary
 
@@ -36,9 +38,9 @@ Path resolution and validation still work outside Git, but freshness checks are 
 2. Read the canonical handoff before editing it
 3. Refresh it using the matching structure in `references/`
 4. Validate it with `scripts/validate_handoff.py`
-5. Check staleness with `scripts/check_staleness.py` when resuming older notes
+5. Resolve the actual resume target with `scripts/resolve_handoff_path.py --resume`, then check staleness with `scripts/check_staleness.py` when resuming older notes
 
-In mixed workspaces, `check_staleness.py` does not blindly scan every child repo by default. It first tries to infer the active workstream or active repo set from the workspace handoff. Use `--workspace-wide` only when you truly want the whole parent folder.
+In mixed workspaces, `check_staleness.py` does not blindly scan every child repo by default. It first resolves the selected workstream or active repo set from the resume target and index. Use `--workspace-wide` only when you truly want the whole parent folder.
 
 On resume requests, the intended flow is: verify, then execute the first unfinished next action. Fresh exploration is fine only when the handoff is stale, ambiguous, contradicted by the repo, or the user explicitly asks to rethink the plan.
 
@@ -56,6 +58,7 @@ Use repo scope when the task belongs to one repository.
 Use workspace scope when the prompt starts from a parent folder that coordinates multiple repositories.
 
 - `_memory/HANDOFF.md` - workspace-wide summary and active workstream index
+- `_memory/INDEX.json` - lightweight machine-readable workstream index for resume targeting
 - `_memory/WORKSPACE.md` - durable workspace overview
 - `_memory/DECISIONS.md` - shared technical decisions
 - `_memory/PATTERNS.md` - repeated conventions across repos
@@ -74,6 +77,8 @@ Use workstream scope when the same workspace contains multiple independent repo 
 - `_memory/workstreams/<name>/handoffs/*.md` - optional timestamped snapshots
 
 Use workstream names for actual initiatives or streams of work, not just raw repo lists. For example, prefer `checkout-flow` over `frontend-backend`.
+
+Canonical files always keep canonical names such as `HANDOFF.md` and `WORKSTREAM.md`. Only snapshots get timestamped names, using `YYYYMMDD_HHMMSS[-n]-<kind>-<label>.md`.
 
 ## Install Scope
 
@@ -99,12 +104,14 @@ The primary memory files should stay inside the repository or workspace root the
 If an agent is using this skill continuously, follow [agent-usage-best-practices.md](references/agent-usage-best-practices.md). The short version:
 
 - Start by resolving the canonical handoff and checking staleness
+- On resume, use `resolve_handoff_path.py --resume` so explicit overrides, repo overlap, and `_memory/INDEX.json` drive target selection
 - On resume, treat `Next Actions` and `Resume Prompt` as the default execution plan
 - Update only one canonical handoff per active scope
 - Use a workstream when one workspace hosts multiple independent repo combinations
 - Touch workspace or workstream companion files only when durable shared context changed
 - Use snapshots only for meaningful transitions, with an explicit kind and reason
-- Validate strictly before ending the session
+- Prefer workspace-relative paths and repo names over machine-specific absolute paths
+- Validate strictly before ending the session only when strict template conformance matters; the default validator mode only checks resume usability
 
 ## Recommended Commands
 
@@ -126,6 +133,12 @@ Initialize a durable workstream overview and record the involved repos:
 python3 scripts/create_handoff.py --project-root <path> --scope workspace --workstream <name> --document workstream --repository <repo-a> --repository <repo-b>
 ```
 
+Resolve the resume target without guessing:
+
+```bash
+python3 scripts/resolve_handoff_path.py --project-root <path> --scope auto --document handoff --resume --format json
+```
+
 Write a timestamped snapshot before refreshing:
 
 ```bash
@@ -136,6 +149,12 @@ Validate structure before ending the session:
 
 ```bash
 python3 scripts/validate_handoff.py --project-root <path> --scope auto --document handoff
+```
+
+Require strict template conformance:
+
+```bash
+python3 scripts/validate_handoff.py --project-root <path> --scope auto --document handoff --strict
 ```
 
 Check whether the current handoff is stale when resuming:

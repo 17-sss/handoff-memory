@@ -12,7 +12,9 @@ Keep shared memory documents close to the work they describe. For a single repos
 This skill keeps one canonical handoff per scope and adds lightweight operational tooling:
 
 - resolve the right document path
+- resolve the right resume target without guessing a workstream
 - create or refresh the canonical file
+- sync a lightweight `_memory/INDEX.json` for workspace workstreams
 - validate that the document is structurally usable
 - check whether the document is stale before trusting it
 - optionally write timestamped session snapshots without making them the primary state
@@ -20,9 +22,10 @@ This skill keeps one canonical handoff per scope and adds lightweight operationa
 ## Compatibility and Prerequisites
 
 - `python3` must be available in `PATH` to run the bundled scripts.
-- `git` must be available in `PATH` for branch metadata and freshness checks.
+- `git` must be available in `PATH` for freshness checks and repo metadata.
 - The skill still resolves paths and validates documents outside Git, but stale checks are less informative there.
 - All bundled scripts are non-interactive and expose `--help`. Prefer running them directly instead of recreating their logic by hand.
+- Branch names may still be recorded in repo-local metadata, but resume selection should not use branch as the primary signal.
 
 ## Default Workflow
 
@@ -40,11 +43,12 @@ Use this as the default flow unless the user already has a stronger convention:
 
 4. Validate it before ending the session.
    Run `scripts/validate_handoff.py --project-root <path> --scope auto --document handoff`.
+   Use `--strict` only when strict template conformance should fail the check. The default mode only requires the handoff to be resume-usable.
 
 5. When resuming, check staleness before trusting old notes.
-   Run `scripts/check_staleness.py --project-root <path> --scope auto --document handoff`.
+   Run `scripts/resolve_handoff_path.py --project-root <path> --scope auto --document handoff --resume --format json` first, then `scripts/check_staleness.py --project-root <path> --scope auto --document handoff`.
 
-In mixed multi-repo workspaces, do not treat the parent folder as automatically workspace-wide. When the active handoff or a dominant workstream already names the relevant repositories, let that narrower repo set drive resume-time validation. Use `--workspace-wide` only when the user explicitly wants status for every child repository.
+In mixed multi-repo workspaces, do not treat the parent folder as automatically workspace-wide. Resume selection should prefer an explicit handoff or workstream, then repo overlap, then `_memory/INDEX.json`, then a unique current workstream. If more than one workstream still matches, return an ambiguous result instead of guessing. Use `--workspace-wide` only when the user explicitly wants status for every child repository.
 
 For resume-style requests such as "continue", "resume", or "pick up where we left off", treat `Next Actions` as the default execution queue and `Resume Prompt` as the default execution framing. Do not reopen design direction that the handoff already narrowed unless the user asks to rethink it or the current repo state clearly invalidates it.
 
@@ -55,6 +59,8 @@ For day-to-day agent behavior, follow `references/agent-usage-best-practices.md`
 ## Path Rules
 
 - Prefer an explicit `--handoff-path` when the project already defines a canonical location.
+- If `--handoff-path` points inside `_memory/workstreams/<name>/...`, the scripts infer workspace scope and workstream name automatically.
+- Explicit `--handoff-path` or `--workstream` should override auto-detection.
 - In repo scope, reuse an existing shared handoff file in a recognized location such as `docs/HANDOFF.md`, `memories/HANDOFF.md`, or `HANDOFF.md`.
 - In workspace scope, keep cross-repo memory under `_memory/`.
 - If no repo handoff exists, create `docs/HANDOFF.md`.
@@ -70,7 +76,9 @@ For day-to-day agent behavior, follow `references/agent-usage-best-practices.md`
   - `_memory/workstreams/<name>/DECISIONS.md`
   - `_memory/workstreams/<name>/PATTERNS.md`
 - Most sessions should only update the canonical handoff for the active scope. Touch companion workspace or workstream documents only when durable shared context changed.
+- In workspace scope, maintain a lightweight `_memory/INDEX.json` with `last_active_workstream` plus per-workstream `canonical_path`, `last_updated`, `status`, and `repositories`.
 - Optional snapshots live under `docs/handoffs/`, `_memory/handoffs/`, or `_memory/workstreams/<name>/handoffs/`.
+- Canonical files keep canonical names such as `HANDOFF.md` and `WORKSTREAM.md`. Only snapshots get timestamped names, using `YYYYMMDD_HHMMSS[-n]-<kind>-<label>.md`.
 - Avoid `.codex`, `.claude`, `.windsurf`, or `.agents` as the default shared mutable handoff location.
 
 ## Scope Guidance
@@ -106,7 +114,8 @@ Use workstream scope when the same workspace hosts multiple independent repo com
 
 - Keep the document scan-friendly. The next session should understand it in under a minute.
 - Start with a strong `TL;DR`.
-- Prefer exact paths, commands, branch names, dates, and repo names over vague prose.
+- Prefer exact workspace-relative paths, commands, dates, and repo names over vague prose.
+- Avoid machine-specific absolute paths such as `/Users/...` or other paths outside the current project root unless they are truly required. The validator warns on foreign absolute paths for portability.
 - Record what is true now, not a transcript of the full chat.
 - Note what changed recently, what is risky, and what should happen next.
 - Include a quick reference section with the few files, commands, dashboards, or docs that matter most.
@@ -126,6 +135,8 @@ The canonical handoff is the shared source of truth. Optional session snapshots 
   - repo: `docs/handoffs/*.md`
   - workspace-wide: `_memory/handoffs/*.md`
   - workstream: `_memory/workstreams/<name>/handoffs/*.md`
+- Workspace index:
+  - `_memory/INDEX.json` with lightweight workstream metadata for resume-time targeting
 
 This model keeps the current state easy to find while still allowing point-in-time captures when they are useful.
 
@@ -133,13 +144,15 @@ This model keeps the current state easy to find while still allowing point-in-ti
 
 When asked to continue work from a prior session:
 
-1. Resolve the canonical handoff path.
+1. Resolve the resume target, not just the generic canonical handoff path.
+   Run `scripts/resolve_handoff_path.py --project-root <path> --scope auto --document handoff --resume --format json`.
+   The selection priority is: explicit `--handoff-path`, explicit `--workstream`, current repo overlap, index `last_active_workstream`, unique current or in-progress workstream, then ambiguous instead of guessed restore.
 2. Read the canonical handoff before planning or editing code.
 3. Treat the first unfinished item in `Next Actions` as the default plan, and treat `Resume Prompt` as the default continuation frame.
 4. Run the staleness check if the document might be old.
 5. If working in workspace scope, read companion memory files only when they are directly relevant.
 6. If the task is only one initiative inside a larger workspace, resolve the workstream document instead of the workspace-wide handoff.
-7. In a parent folder with unrelated repositories, narrow validation to the active workstream or the repositories named in the handoff before falling back to a workspace-wide scan.
+7. In a parent folder with unrelated repositories, narrow validation to the selected workstream or the repositories named in the selected handoff before considering a workspace-wide scan.
 8. Compare the document against the current repo, workstream, or workspace state and call out drift.
 9. Execute the first unfinished next action. Explore only as needed to complete it, not to replace it with fresh design work.
 10. Refresh and validate the canonical handoff again before ending the session if anything material changed.
@@ -148,19 +161,19 @@ When asked to continue work from a prior session:
 
 ### `scripts/resolve_handoff_path.py`
 
-Resolve the canonical repo-local, workspace-wide, or workstream-specific memory path. Use `--scope repo|workspace|auto`, `--document handoff|workspace|workstream|decisions|patterns`, `--workstream`, or `--handoff-path` to honor an explicit override. Use `--ensure` to create the file when it does not exist.
+Resolve the canonical repo-local, workspace-wide, or workstream-specific memory path. Use `--scope repo|workspace|auto`, `--document handoff|workspace|workstream|decisions|patterns`, `--workstream`, or `--handoff-path` to honor an explicit override. Use `--resume` to apply resume target selection and return `ambiguous` instead of guessing when multiple workstreams still match. Use `--ensure` to create the file when it does not exist.
 
 ### `scripts/create_handoff.py`
 
-Initialize or refresh the canonical file and sync metadata such as project root, branch, and update timestamp. Use `--snapshot --snapshot-kind <kind> --snapshot-reason <text>` to write a timestamped archive copy before the canonical file is refreshed.
+Initialize or refresh the canonical file and sync metadata such as project root and update timestamp. In workspace scope, this also refreshes `_memory/INDEX.json`. Use `--snapshot --snapshot-kind <kind> --snapshot-reason <text>` to write a timestamped archive copy before the canonical file is refreshed.
 
 ### `scripts/validate_handoff.py`
 
-Check that the document has the required sections, does not leave obvious placeholders behind, and stays short enough to be useful. Use `--strict` when placeholders or empty sections should fail validation.
+Check that the document is resume-usable by default, warn on portability issues such as foreign absolute paths, and stay short enough to be useful. Use `--strict` when strict template conformance should fail on missing sections, placeholders, or empty required sections.
 
 ### `scripts/check_staleness.py`
 
-Compare the handoff timestamp against recent repo activity. In workspace scope, the script first tries to infer the active workstream or active repo set from `_memory/HANDOFF.md` before scanning every child repo. Use `--workspace-wide` only when the user explicitly wants full parent-folder status.
+Compare the handoff timestamp against recent repo activity. The script prefers `Last Updated` metadata over file `mtime`, uses the selected workstream's declared repos when available, and does not fall back to scanning every child repo unless `--workspace-wide` is explicit. If resume targeting is ambiguous, it returns an ambiguous result instead of guessing.
 
 ## References
 
