@@ -137,6 +137,7 @@ def main() -> int:
 
     if not resolution.handoff_path.exists():
         payload = {
+            **resume_target.to_payload(),
             **resolution.to_payload(),
             "stale": True,
             "reasons": ["Document does not exist."],
@@ -219,8 +220,8 @@ def main() -> int:
         reasons.append(f"Dirty repositories: {', '.join(dirty_repos)}")
 
     payload = {
-        **resolution.to_payload(),
         **resume_target.to_payload(),
+        **resolution.to_payload(),
         "stale": bool(reasons),
         "age_hours": age_hours,
         "max_age_hours": max_age_hours,

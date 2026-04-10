@@ -403,9 +403,9 @@ USABILITY_SECTION_REQUIREMENTS = {
 _EMPTY_METADATA_RE = re.compile(r"^(\s*-\s+[^:]+:\s*)$")
 _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 _WORKSTREAM_LINE_RE = re.compile(r"^- Workstream:\s*(.+?)\s*$", re.MULTILINE)
-_REPO_LINE_RE = re.compile(r"^- Repo:\s*(.+?)\s*$", re.MULTILINE)
-_INVOLVED_REPOS_RE = re.compile(r"^- Repositories involved:\s*(.+?)\s*$", re.MULTILINE)
-_KEY_REPOSITORIES_RE = re.compile(r"^- Key repositories:\s*(.+?)\s*$", re.MULTILINE)
+_REPO_LINE_RE = re.compile(r"^- Repo:\s*([^\n]*)$", re.MULTILINE)
+_INVOLVED_REPOS_RE = re.compile(r"^- Repositories involved:\s*([^\n]*)$", re.MULTILINE)
+_KEY_REPOSITORIES_RE = re.compile(r"^- Key repositories:\s*([^\n]*)$", re.MULTILINE)
 _ABSOLUTE_PATH_RE = re.compile(r"(?<![:\w])(\/(?:[A-Za-z0-9._~-]+\/)+[A-Za-z0-9._~-]+)")
 _PLACEHOLDER_VALUES = {
     "",
@@ -1173,8 +1173,8 @@ def repo_status(
 def repositories_from_overview_text(text: str) -> list[str]:
     sections = section_bodies(text)
     repo_section = sections.get("Repositories", "")
-    names = [match.group(1).strip() for match in _REPO_LINE_RE.finditer(repo_section)]
-    return [name for name in names if name and name.lower() != "repo"]
+    names = [normalize_repository_reference(match.group(1)) for match in _REPO_LINE_RE.finditer(repo_section)]
+    return [name for name in names if name]
 
 
 def repositories_from_handoff_text(text: str) -> list[str]:
@@ -1184,12 +1184,26 @@ def repositories_from_handoff_text(text: str) -> list[str]:
     return split_repository_names(match.group(1))
 
 
+def normalize_repository_reference(raw: str) -> str | None:
+    value = str(raw).strip().strip("`")
+    if not value:
+        return None
+    lowered = value.lower()
+    if lowered in _PLACEHOLDER_VALUES:
+        return None
+    if value.startswith("- "):
+        return None
+    if value.endswith(":"):
+        return None
+    return value
+
+
 def split_repository_names(raw: str) -> list[str]:
     value = raw.strip()
-    if not value or value.lower() in _PLACEHOLDER_VALUES:
+    if not value:
         return []
-    parts = [part.strip(" `") for part in value.split(",")]
-    return [part for part in parts if part and part.lower() not in _PLACEHOLDER_VALUES]
+    parts = [normalize_repository_reference(part) for part in value.split(",")]
+    return [part for part in parts if part]
 
 
 def workspace_workstreams_from_handoff_text(text: str) -> list[dict[str, object]]:
@@ -1312,9 +1326,9 @@ def load_workspace_index(project_root: Path) -> dict[str, object]:
             "last_updated": record.get("last_updated"),
             "status": str(record.get("status") or "").strip(),
             "repositories": [
-                str(repository).strip()
+                repository_name
                 for repository in repositories
-                if str(repository).strip()
+                if (repository_name := normalize_repository_reference(str(repository)))
             ],
         }
 
@@ -1561,7 +1575,7 @@ def sync_workspace_index(
             handoff_path = workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md"
             _, last_updated, _ = document_timestamp_info(handoff_path)
 
-        if repositories:
+        if resolution.document in {"handoff", "workstream"}:
             current_record["repositories"] = repositories
         current_record["canonical_path"] = str(
             (workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md").resolve()
@@ -1577,8 +1591,7 @@ def sync_workspace_index(
             workstream_name = str(entry["name"])
             current_record = dict(workstreams.get(workstream_name, {}))
             repositories = list(entry.get("repositories", []))
-            if repositories:
-                current_record["repositories"] = repositories
+            current_record["repositories"] = repositories
             current_record["canonical_path"] = str(
                 (workstream_directory(resolution.project_root, workstream_name) / "HANDOFF.md").resolve()
             )
