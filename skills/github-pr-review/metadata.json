@@ -1,0 +1,16 @@
+{
+  "name": "github-pr-review",
+  "version": "0.1.0",
+  "organization": "17-sss",
+  "date": "April 2026",
+  "abstract": "Agent-neutral workflow for authenticating GitHub CLI, identifying public or private pull requests, collecting PR context, reviewing for bugs and regression risk, drafting findings, and posting confirmed review comments as the user's authenticated GitHub account.",
+  "references": [
+    "https://skills.sh/onewave-ai/claude-skills/code-review-pro",
+    "https://skills.sh/obra/superpowers/requesting-code-review",
+    "https://skills.sh/wshobson/agents/code-review-excellence",
+    "https://skills.sh/borghei/claude-skills/pr-review-expert",
+    "https://skillsmp.com/skills/agynio-gh-pr-review-skill-md",
+    "https://cli.github.com/manual/gh_pr_review",
+    "https://docs.github.com/en/rest/pulls/comments?apiVersion=2022-11-28"
+  ]
+}
