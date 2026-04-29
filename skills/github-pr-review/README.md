@@ -2,6 +2,8 @@
 
 Agent-neutral workflow for reviewing GitHub pull requests with `gh`, local `git`, tests, and GitHub APIs, then posting review comments as the authenticated GitHub account.
 
+![GitHub PR Review visual guide](assets/github-pr-review-visual.png)
+
 ## Requirements
 
 - GitHub CLI `gh`

@@ -2,6 +2,8 @@
 
 A collection of reusable skills for AI coding agents. Skills are packaged instructions and helper scripts that extend agent capabilities while keeping the workflow repository-friendly.
 
+![Agent Skills](assets/skill-visuals/agent-skills-dino-hero.png)
+
 ## Available Skills
 
 ### handoff-memory
@@ -22,6 +24,25 @@ Agent-neutral workflow for creating and maintaining shared repo-local, workspace
 - Adds helper scripts for create, validate, and staleness checks
 - Supports optional timestamped snapshots with explicit kind/reason metadata under `docs/handoffs/` or `_memory/handoffs/`
 - Supports global or project-local skill installation, while keeping the shared data inside the repository or workspace root
+
+### github-pr-review
+
+Agent-neutral workflow for reviewing GitHub pull requests with `gh`, local `git`, tests, and GitHub APIs, then posting review comments as the authenticated GitHub account.
+
+**Use when:**
+- Setting up OAuth or GitHub CLI authentication for PR reviews
+- Reviewing a PR URL, `owner/repo#123`, or the current branch PR
+- Leaving review comments as the user's GitHub account
+- Reviewing public or private repository PRs
+- Collecting PR diff, checks, and related code context before drafting feedback
+
+**Behavior:**
+- Checks `gh auth status` and confirms the posting account without exposing tokens
+- Supports PR URLs, `owner/repo#123`, PR numbers, branches, and current-branch PR lookup
+- Separates public read access from authenticated review posting
+- Explains private repo failures such as missing access, org SSO, or insufficient scopes
+- Drafts findings first and posts only after confirmation unless immediate posting was requested
+- Uses explicit-only `approve` and `request-changes` events
 
 ## Installation
 

@@ -2,6 +2,8 @@
 
 Agent-neutral workflow for maintaining shared handoff and memory documents for a single repository, a multi-repository workspace, or a workstream inside that workspace.
 
+![Handoff Memory visual guide](assets/handoff-memory-visual.png)
+
 ## Requirements
 
 - `python3` in `PATH` for the bundled scripts
