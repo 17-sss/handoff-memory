@@ -1,0 +1,8 @@
+{
+  "name": "commit-helper",
+  "version": "0.3.0",
+  "organization": "17-sss",
+  "date": "April 2026",
+  "abstract": "Generic commit-message helper that inspects explicit repo-local rules, recent history, and staged semantics to support conventional, gitmoji, plain imperative, and repo-custom commit styles with conservative fallback behavior.",
+  "references": []
+}

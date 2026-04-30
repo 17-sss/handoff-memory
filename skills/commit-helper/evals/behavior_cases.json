@@ -1,0 +1,58 @@
+[
+  {
+    "name": "explicit_conventional_repo",
+    "goal": "Keep Conventional Commits when explicit repo docs require them."
+  },
+  {
+    "name": "explicit_gitmoji_allowlist_repo",
+    "goal": "Enable gitmoji strongly and reject emojis outside the repo-local allowlist."
+  },
+  {
+    "name": "plain_imperative_history_repo",
+    "goal": "Preserve plain imperative subjects when history is clearly plain."
+  },
+  {
+    "name": "mixed_history_without_rules",
+    "goal": "Fall back to Conventional Commits when history is mixed and explicit rules are absent."
+  },
+  {
+    "name": "presentational_modal_cleanup",
+    "goal": "Do not overclassify UI layout, spacing, or wrapper cleanup as bugfix."
+  },
+  {
+    "name": "actual_validation_bugfix",
+    "goal": "Classify actual broken behavior or validation failures as bugfix."
+  },
+  {
+    "name": "file_move_or_legacy_move",
+    "goal": "Classify file moves as move or structure, not generic bugfix."
+  },
+  {
+    "name": "title_only_preferred_repo",
+    "goal": "Allow safe title-only drafting when history does not require commit bodies."
+  },
+  {
+    "name": "multiline_body_without_literal_backslash_n",
+    "goal": "Create multiline commit bodies without storing a literal \\n sequence."
+  },
+  {
+    "name": "korean_emoji_repo_phrasing",
+    "goal": "In a Korean-centric emoji repo, polish awkward translated wording into shorter and more natural Korean commit wording."
+  },
+  {
+    "name": "korean_verbose_summary_polish",
+    "goal": "Shorten verbose Korean phrasing like '...을 위한' or '...에 대한' into natural commit wording without changing meaning."
+  },
+  {
+    "name": "mixed_repo_language_profile",
+    "goal": "Infer dominant language and tone from mixed history instead of forcing one global phrasing style."
+  },
+  {
+    "name": "explicit_conventional_repo_with_natural_wording",
+    "goal": "Keep explicit conventional format while still polishing the summary wording naturally."
+  },
+  {
+    "name": "explicit_gitmoji_repo_with_natural_wording",
+    "goal": "Keep the allowlist and gitmoji mode while polishing the summary wording to match repo-local phrasing."
+  }
+]

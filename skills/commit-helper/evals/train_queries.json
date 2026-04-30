@@ -1,0 +1,38 @@
+[
+  {
+    "query": "Inspect the staged changes in this repository and draft a commit message that matches the repo's local style family.",
+    "should_trigger": true
+  },
+  {
+    "query": "Before I commit, check whether this repo uses conventional commits, gitmoji, or plain imperative titles and draft the right message for the staged changes.",
+    "should_trigger": true
+  },
+  {
+    "query": "Analyze explicit commit rules in this repo, then suggest a commit title/body for the staged files only.",
+    "should_trigger": true
+  },
+  {
+    "query": "If this repo has a gitmoji allowlist or emoji commit policy, follow it. Otherwise use a safe fallback commit style.",
+    "should_trigger": true
+  },
+  {
+    "query": "The history here is mixed. Draft a conservative commit message for the staged changes without guessing a custom style.",
+    "should_trigger": true
+  },
+  {
+    "query": "Inspect this repo's recent commits and polish my staged commit title so it matches the team's usual Korean wording, not just the format.",
+    "should_trigger": true
+  },
+  {
+    "query": "Check whether this repo writes commits in Korean, English, or a mix, then draft a commit subject in the same tone for the staged diff.",
+    "should_trigger": true
+  },
+  {
+    "query": "Write me a PR summary from the current branch.",
+    "should_trigger": false
+  },
+  {
+    "query": "Refactor this component to use Panda CSS tokens.",
+    "should_trigger": false
+  }
+]

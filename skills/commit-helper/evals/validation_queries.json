@@ -1,0 +1,30 @@
+[
+  {
+    "query": "Check this repo's explicit commit rules and draft a matching commit message for the staged files.",
+    "should_trigger": true
+  },
+  {
+    "query": "I only want a commit suggestion that follows this repository's style family, with a safe fallback if the history is mixed.",
+    "should_trigger": true
+  },
+  {
+    "query": "If the repo is emoji-based, keep to the local allowlist. If not, don't force gitmoji.",
+    "should_trigger": true
+  },
+  {
+    "query": "The staged change is mostly layout cleanup. Draft a commit message without overclassifying it as a bug fix.",
+    "should_trigger": true
+  },
+  {
+    "query": "This repo usually writes short Korean commit titles. Polish my summary so it sounds natural for the repo before committing.",
+    "should_trigger": true
+  },
+  {
+    "query": "Follow the repo's commit format, but also match the recent wording style and language in the final title.",
+    "should_trigger": true
+  },
+  {
+    "query": "Generate release notes from the last ten commits.",
+    "should_trigger": false
+  }
+]

@@ -44,6 +44,24 @@ Agent-neutral workflow for reviewing GitHub pull requests with `gh`, local `git`
 - Drafts findings first and posts only after confirmation unless immediate posting was requested
 - Uses explicit-only `approve` and `request-changes` events
 
+### commit-helper
+
+Reusable commit-message helper that inspects explicit repo-local rules, recent history, and staged changes before drafting or creating commits.
+
+**Use when:**
+- The user asks for a commit message
+- The user wants to commit staged changes but the repo convention is unclear
+- A workflow needs to create commits in the target repository's local style
+- The current repository may use conventional, gitmoji, plain imperative, or custom commit formats
+
+**Behavior:**
+- Follows `explicit local rules > recent history > conservative fallback`
+- Uses staged changes only when drafting commit messages
+- Separates commit format from repo-local phrasing
+- Falls back to Conventional Commits when no strong local signal exists
+- Supports conventional, gitmoji, plain imperative, and repo-custom styles
+- Uses a safe script path for multiline commit bodies without literal `\n`
+
 ## Installation
 
 Install from this collection interactively:

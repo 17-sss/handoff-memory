@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit Helper"
+  short_description: "Draft repo-specific commit messages across common style families"
+  default_prompt: "Use $commit-helper to inspect explicit repo rules, recent history, and staged changes, then draft a safe commit message in the right style family."
