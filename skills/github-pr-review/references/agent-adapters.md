@@ -6,6 +6,17 @@ This package is intentionally agent-neutral. The core workflow is `SKILL.md` plu
 
 Install under a discoverable skills directory such as `$CODEX_HOME/skills/github-pr-review`, `~/.codex/skills/github-pr-review`, or a project-local skill path. `agents/openai.yaml` is only UI metadata; it does not define the workflow.
 
+`gh` commands that contact GitHub may need sandbox/network escalation in Codex environments. If a required `gh` command fails with a likely sandbox or network error, rerun it through the environment's approval path, for example with `sandbox_permissions: "require_escalated"` on Codex shell tool calls, rather than switching to browser automation.
+
+Useful scoped approval prefixes:
+
+- `["gh", "auth", "status"]`
+- `["gh", "pr", "view"]`
+- `["gh", "pr", "diff"]`
+- `["gh", "api"]`
+
+Keep tokens out of prompts, logs, and files. Prefer the authenticated `gh` session.
+
 ## Claude Code
 
 Place the folder where Claude Code loads skills or reference `SKILL.md` from project instructions. Keep GitHub authentication in `gh`, not in `CLAUDE.md` or project files.

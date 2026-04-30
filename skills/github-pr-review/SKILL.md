@@ -1,6 +1,6 @@
 ---
 name: github-pr-review
-description: Agent-neutral workflow for reviewing GitHub pull requests with gh CLI, local git, tests, and GitHub REST or GraphQL APIs, then posting review comments as the user's authenticated GitHub account. Use when asked to set up PR review authentication, review a PR URL, review owner/repo#123, review the current branch PR, post PR review comments, review public or private repo PRs, use gh to inspect a PR diff, or leave feedback from the user's GitHub account.
+description: Agent-neutral workflow for reviewing GitHub pull requests with gh CLI, local git, tests, and GitHub REST or GraphQL APIs, then posting summary or inline review comments as the user's authenticated GitHub account. Use when asked to set up PR review authentication, review a PR URL, review owner/repo#123, review the current branch PR, post PR review comments, review public or private repo PRs, use gh to inspect a PR diff, or leave feedback from the user's GitHub account.
 ---
 
 # GitHub PR Review
@@ -19,6 +19,7 @@ The workflow supports public and private repositories. Reading a public PR may b
 - Draft the review first and ask for confirmation before posting unless the user explicitly said to post immediately.
 - Use `approve` or `request changes` only when the user explicitly asks for that event. Default to a non-approving comment review.
 - Prefer one batched review over scattered comments. Use inline comments only when the file and diff line mapping are certain.
+- Prefer JSON payloads with `gh api --input` for multi-comment inline reviews. Avoid shell-expanded nested `comments[]` flags unless the payload is trivial.
 
 ## Workflow
 
@@ -180,12 +181,102 @@ For inline comments, prefer the GitHub API only when line mapping is reliable. R
 
 GraphQL can be used for review-thread operations such as adding review threads or replies. The `gh pr-review` extension from `agynio/gh-pr-review` is an optional convenience when installed, but this skill must still work with plain `gh pr review` and `gh api`.
 
-### 8. Failure and Fallback
+### 8. Verify Inline Line Mapping
+
+Inline comments must point to lines that are present in the PR diff, not merely to any line in the base branch. For new or modified code, use `side: RIGHT` and the target line number from the PR's head-side file. Use `side: LEFT` only for removed lines.
+
+Before posting inline comments:
+
+1. Inspect the patch:
+
+   ```bash
+   gh pr diff <pr>
+   ```
+
+2. Confirm the local file line when the checkout is available:
+
+   ```bash
+   nl -ba path/to/file.ext | sed -n '120,140p'
+   ```
+
+3. Confirm the file's PR patch from the API when possible:
+
+   ```bash
+   gh api repos/OWNER/REPO/pulls/NUMBER/files --paginate \
+     --jq '.[] | select(.filename == "path/to/file.ext") | .patch'
+   ```
+
+4. Verify the target line is inside a diff hunk as an added line or context line for `side: RIGHT`.
+5. If any mapping is uncertain, do not post inline comments. Post a summary review with file and line references instead.
+
+### 9. Post Inline Review Comments
+
+For one or more inline comments, prefer one review payload and `gh api --input`. This is more reliable than composing nested `comments[]` parameters in shell flags.
+
+Create a temporary payload file. Use a sanitized repo slug and PR number, for example `/tmp/owner-repo-pr123-review.json`. Do not include tokens, secrets, raw auth headers, or unrelated private logs in this file.
+
+```json
+{
+  "event": "COMMENT",
+  "body": "Reviewed the PR and left inline notes on the risky parts.",
+  "comments": [
+    {
+      "path": "src/example.ts",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "This condition now allows an empty value through. Please add a guard or a regression test for that case."
+    },
+    {
+      "path": "src/other.ts",
+      "line": 87,
+      "side": "RIGHT",
+      "body": "This call can now run before the token is initialized. Consider keeping the previous ordering or handling the missing-token branch."
+    }
+  ]
+}
+```
+
+Post it:
+
+```bash
+gh api repos/OWNER/REPO/pulls/NUMBER/reviews \
+  --method POST \
+  --input /tmp/owner-repo-pr123-review.json \
+  --jq '{id, state, html_url}'
+```
+
+Expected state for a comment-only review is `COMMENTED`. Give the `html_url` to the user. Delete the payload after posting when it is no longer needed:
+
+```bash
+rm /tmp/owner-repo-pr123-review.json
+```
+
+Only set `"event": "APPROVE"` or `"event": "REQUEST_CHANGES"` when the user explicitly asked for that review action. For multi-line comments, add `start_line` and `start_side` after verifying both ends of the range in the diff.
+
+### 10. Verify Posted Review
+
+After posting, verify the response and optionally confirm through the PR reviews list:
+
+```bash
+review_id=123456789
+gh api repos/OWNER/REPO/pulls/NUMBER/reviews --paginate \
+  --jq ".[] | select(.id == $review_id) | {id, state, html_url, user: .user.login}"
+```
+
+Check that:
+
+- `state` is `COMMENTED` for normal review comments.
+- `html_url` is present and opens the submitted review.
+- `user.login` matches the authenticated account.
+- The user received the `html_url` or a concise summary of where the review was posted.
+
+### 11. Failure and Fallback
 
 - If `gh` is missing, ask the user to install GitHub CLI before continuing.
 - If authentication is missing, use `gh auth login`; do not switch to browser automation for normal login.
 - If private access fails, distinguish wrong repo/PR, missing repo permission, SSO/SAML authorization, and insufficient OAuth scopes as far as the error allows.
 - If `gh pr review` cannot express needed inline comments, use `gh api` with REST or GraphQL.
+- If `gh api` returns a validation error for inline comments, re-check `path`, `line`, `side`, and whether the line is present in the diff. Fall back to a summary review if still uncertain.
 - Mention browser automation only as a last fallback when CLI/API access is blocked and the user explicitly wants to proceed that way.
 
 ## Scripts
