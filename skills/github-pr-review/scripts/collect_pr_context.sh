@@ -27,6 +27,25 @@ warn() {
   printf 'warning: %s\n' "$*" >&2
 }
 
+sanitize_stream() {
+  sed -E \
+    -e 's/(Authorization:[[:space:]]*)([^[:space:]]+)/\1[REDACTED]/Ig' \
+    -e 's/(token|GH_TOKEN|GITHUB_TOKEN|PAT)=([^[:space:]]+)/\1=[REDACTED]/Ig' \
+    -e 's#https?://[^/@[:space:]]+(:[^/@[:space:]]+)?@#https://[REDACTED]@#g' \
+    -e 's/(github_pat_|gh[pousr]_)[A-Za-z0-9_]+/\1[REDACTED]/g'
+}
+
+sanitize_file() {
+  local file=$1 tmp_file
+  [[ -f "$file" ]] || return 0
+  tmp_file="${file}.sanitized.$$"
+  if sanitize_stream <"$file" >"$tmp_file"; then
+    mv "$tmp_file" "$file"
+  else
+    rm -f "$tmp_file"
+  fi
+}
+
 classify_error() {
   local err_file=$1
   local message
@@ -85,12 +104,16 @@ run_capture() {
 
   printf 'collecting %s...\n' "$label"
   if ! "$@" > "$out_file" 2> "$err_file"; then
+    sanitize_file "$out_file"
+    sanitize_file "$err_file"
     classify_error "$err_file"
     printf 'failed command:'
     printf ' %q' "$@"
     printf '\n'
     return 1
   fi
+  sanitize_file "$out_file"
+  sanitize_file "$err_file"
 }
 
 PR_REF=""
@@ -176,7 +199,12 @@ run_capture "diff patch" "$OUTPUT_DIR/pr-diff.patch" "$OUTPUT_DIR/pr-diff.err" \
   gh pr diff "${pr_args[@]}"
 
 if ! gh pr checks "${pr_args[@]}" > "$OUTPUT_DIR/pr-checks.txt" 2> "$OUTPUT_DIR/pr-checks.err"; then
+  sanitize_file "$OUTPUT_DIR/pr-checks.txt"
+  sanitize_file "$OUTPUT_DIR/pr-checks.err"
   warn "PR checks were unavailable or failed; continuing with saved stderr."
+else
+  sanitize_file "$OUTPUT_DIR/pr-checks.txt"
+  sanitize_file "$OUTPUT_DIR/pr-checks.err"
 fi
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

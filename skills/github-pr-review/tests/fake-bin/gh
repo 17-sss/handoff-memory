@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cmd=${1:-}
+shift || true
+case "$cmd" in
+  auth)
+    [[ "${1:-}" == "status" ]] && exit 0
+    ;;
+  api)
+    if [[ "${1:-}" == "user" ]]; then
+      printf 'reviewer\n'
+      exit 0
+    fi
+    ;;
+  pr)
+    sub=${1:-}
+    shift || true
+    case "$sub" in
+      review)
+        printf 'HTTP 403 Authorization: token=%s\n' "${FAKE_SECRET_TOKEN:-secret}" >&2
+        exit 1
+        ;;
+      view)
+        printf 'HTTP 404 Authorization: token=%s url=https://x-access-token:%s@github.com/OWNER/REPO.git\n' "${FAKE_SECRET_TOKEN:-secret}" "${FAKE_SECRET_TOKEN:-secret}" >&2
+        exit 1
+        ;;
+      diff|checks)
+        printf 'Authorization: token=%s\n' "${FAKE_SECRET_TOKEN:-secret}" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+esac
+printf 'unexpected gh invocation: %s %s\n' "$cmd" "$*" >&2
+exit 1

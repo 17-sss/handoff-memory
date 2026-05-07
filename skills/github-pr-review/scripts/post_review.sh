@@ -21,6 +21,18 @@ warn() {
   printf 'warning: %s\n' "$*" >&2
 }
 
+sanitize_stream() {
+  sed -E \
+    -e 's/(Authorization:[[:space:]]*)([^[:space:]]+)/\1[REDACTED]/Ig' \
+    -e 's/(token|GH_TOKEN|GITHUB_TOKEN|PAT)=([^[:space:]]+)/\1=[REDACTED]/Ig' \
+    -e 's#https?://[^/@[:space:]]+(:[^/@[:space:]]+)?@#https://[REDACTED]@#g' \
+    -e 's/(github_pat_|gh[pousr]_)[A-Za-z0-9_]+/\1[REDACTED]/g'
+}
+
+print_sanitized_error_file() {
+  sanitize_stream < "$1" >&2
+}
+
 classify_error() {
   local err_file=$1
   local message
@@ -185,7 +197,7 @@ fi
 err_file=$(mktemp)
 if ! "${cmd[@]}" 2> "$err_file"; then
   classify_error "$err_file"
-  cat "$err_file" >&2
+  print_sanitized_error_file "$err_file"
   rm -f "$err_file"
   exit 1
 fi
