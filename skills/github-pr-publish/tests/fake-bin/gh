@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+log=${FAKE_GH_LOG:?FAKE_GH_LOG is required}
+printf 'gh' >>"$log"
+printf ' %q' "$@" >>"$log"
+printf '\n' >>"$log"
+
+repo=${FAKE_REPO:-OWNER/REPO}
+base=${FAKE_BASE:-main}
+account=${FAKE_ACCOUNT:-octocat}
+url=${FAKE_PR_URL:-https://github.com/OWNER/REPO/pull/123}
+
+gh_die() { printf '%s\n' "$*" >&2; exit 1; }
+
+case "${1:-}" in
+  auth)
+    if [[ "${2:-}" == "status" ]]; then
+      [[ "${FAKE_AUTH_FAIL:-0}" == "1" ]] && gh_die 'HTTP 401 Bad credentials'
+      printf 'Logged in to github.com as %s\n' "$account"; exit 0
+    fi
+    ;;
+  api)
+    if [[ "${2:-}" == "user" ]]; then
+      printf '%s\n' "$account"; exit 0
+    fi
+    if [[ "${2:-}" == "-i" ]]; then
+      if [[ "${FAKE_API_FAIL:-0}" == "1" ]]; then gh_die 'HTTP 403 Resource not accessible'; fi
+      printf 'HTTP/2 201 Created\n\n{"html_url":"%s","number":123}\n' "$url"; exit 0
+    fi
+    printf '{}\n'; exit 0
+    ;;
+  repo)
+    if [[ "${2:-}" == "view" ]]; then
+      if [[ "$*" == *"--jq .defaultBranchRef.name"* ]]; then printf '%s\n' "$base"; else printf '{"nameWithOwner":"%s","visibility":"PRIVATE","defaultBranchRef":{"name":"%s"},"url":"https://github.com/%s"}\n' "$repo" "$base" "$repo"; fi
+      exit 0
+    fi
+    ;;
+  pr)
+    if [[ "${2:-}" == "create" ]]; then
+      [[ "${FAKE_CREATE_404:-0}" == "1" ]] && gh_die "HTTP 404 Not Found Authorization: token=${FAKE_SECRET_TOKEN:-secret}"
+      [[ "${FAKE_CREATE_FAIL:-0}" == "1" ]] && gh_die 'HTTP 422 Validation Failed'
+      printf '%s\n' "$url"; exit 0
+    fi
+    if [[ "${2:-}" == "view" ]]; then
+      printf '{"number":123,"url":"%s","state":"OPEN","isDraft":false,"headRefName":"feature-branch","baseRefName":"main","author":{"login":"%s"}}\n' "$url" "$account"; exit 0
+    fi
+    if [[ "${2:-}" == "list" ]]; then printf '[]\n'; exit 0; fi
+    if [[ "${2:-}" == "status" ]]; then printf 'No current branch\n'; exit 0; fi
+    ;;
+esac
+
+printf 'fake gh: unsupported command:' >&2
+printf ' %q' "$@" >&2
+printf '\n' >&2
+exit 0

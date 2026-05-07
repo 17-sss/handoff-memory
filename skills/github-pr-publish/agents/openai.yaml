@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub PR Publish"
+  short_description: "Safely publish GitHub PRs with gh"
+  default_prompt: "Use $github-pr-publish to preflight a branch, draft PR content, and publish a GitHub pull request only through explicit safe flags."

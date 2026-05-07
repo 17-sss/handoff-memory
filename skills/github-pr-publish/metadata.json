@@ -1,0 +1,16 @@
+{
+  "name": "github-pr-publish",
+  "version": "0.1.0",
+  "organization": "17-sss",
+  "date": "May 2026",
+  "abstract": "Agent-neutral workflow for safely publishing GitHub pull requests with gh, local git, and constrained GitHub REST fallback. It supports public and private repositories by using authenticated GitHub CLI access, preview-by-default command construction, explicit head branches, guarded pushes, access diagnostics, and fake gh/git tests that prove no unintended mutation or credential leakage.",
+  "references": [
+    "https://cli.github.com/manual/gh_pr_create",
+    "https://cli.github.com/manual/gh_auth_status",
+    "https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#create-a-pull-request",
+    "https://cli.github.com/manual/gh_api",
+    "https://cli.github.com/manual/gh_repo_view",
+    "https://git-scm.com/docs/git-push",
+    "../github-pr-review/SKILL.md"
+  ]
+}

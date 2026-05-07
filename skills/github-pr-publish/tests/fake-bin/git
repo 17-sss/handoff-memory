@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+log=${FAKE_GIT_LOG:?FAKE_GIT_LOG is required}
+printf 'git' >>"$log"
+printf ' %q' "$@" >>"$log"
+printf '\n' >>"$log"
+
+branch=${FAKE_BRANCH:-feature-branch}
+remote_url=${FAKE_REMOTE_URL:-git@github.com:OWNER/REPO.git}
+remote_has_head=${FAKE_REMOTE_HAS_HEAD:-1}
+
+git_die() { printf 'fake git error: %s\n' "$*" >&2; exit 1; }
+
+case "${1:-}" in
+  symbolic-ref)
+    if [[ "${FAKE_DETACHED:-0}" == "1" ]]; then exit 1; fi
+    if [[ "${2:-}" == "--quiet" && "${3:-}" == "--short" && "${4:-}" == "HEAD" ]]; then
+      printf '%s\n' "$branch"; exit 0
+    fi
+    ;;
+  remote)
+    if [[ "${2:-}" == "get-url" ]]; then
+      [[ "${3:-origin}" == "origin" || -n "${FAKE_REMOTE_URL:-}" ]] || git_die "unknown remote"
+      printf '%s\n' "$remote_url"; exit 0
+    fi
+    if [[ "${2:-}" == "-v" ]]; then
+      printf 'origin\t%s (fetch)\norigin\t%s (push)\n' "$remote_url" "$remote_url"; exit 0
+    fi
+    ;;
+  ls-remote)
+    if [[ "$remote_has_head" == "1" ]]; then
+      printf 'abc123\t%s\n' "${3:-refs/heads/$branch}"; exit 0
+    fi
+    exit 2
+    ;;
+  push)
+    if [[ "${FAKE_ALLOW_PUSH:-0}" != "1" ]]; then
+      printf 'unexpected push\n' >&2; exit 97
+    fi
+    printf 'pushed\n'; exit 0
+    ;;
+  rev-parse)
+    if [[ "${2:-}" == "--is-inside-work-tree" ]]; then printf 'true\n'; exit 0; fi
+    if [[ "${2:-}" == "--show-toplevel" ]]; then printf '/tmp/fake-repo\n'; exit 0; fi
+    if [[ "${2:-}" == "--abbrev-ref" ]]; then printf 'origin/%s\n' "$branch"; exit 0; fi
+    ;;
+  status)
+    exit 0
+    ;;
+  branch)
+    if [[ "${2:-}" == "--show-current" ]]; then printf '%s\n' "$branch"; exit 0; fi
+    ;;
+  rev-list)
+    printf '0\t1\n'; exit 0
+    ;;
+esac
+
+printf 'fake git: unsupported command:' >&2
+printf ' %q' "$@" >&2
+printf '\n' >&2
+exit 0

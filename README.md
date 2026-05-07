@@ -44,6 +44,24 @@ Agent-neutral workflow for reviewing GitHub pull requests with `gh`, local `git`
 - Drafts findings first and posts only after confirmation unless immediate posting was requested
 - Uses explicit-only `approve` and `request-changes` events
 
+### github-pr-publish
+
+Agent-neutral workflow for safely publishing GitHub pull requests with `gh`, local `git`, and constrained GitHub REST fallback.
+
+**Use when:**
+- Creating, opening, publishing, or preflighting a GitHub pull request from a local branch
+- Publishing PRs for public or private repositories through the authenticated GitHub CLI account
+- Pushing a local feature branch only as an explicit part of PR creation
+- Diagnosing PR creation failures such as missing auth, org SSO, insufficient permission, private repo not-found masking, or validation errors
+- Avoiding unsafe `gh pr create` prompting, fork creation, or accidental pushes
+
+**Behavior:**
+- Previews by default and performs no push, PR creation, browser open, or mutating API call without explicit confirmation flags
+- Requires prompt-free PR content and an explicit `--head` for creation
+- Guards pushes behind `--push --remote <name> --yes` and rejects unsafe branch, fork, force, detached HEAD, and wrong-remote cases
+- Supports constrained REST fallback only after remote-head verification
+- Includes fake `gh`/`git` tests for command construction, no-mutation defaults, and token redaction
+
 ### commit-helper
 
 Reusable commit-message helper that inspects explicit repo-local rules, recent history, and staged changes before drafting or creating commits.
