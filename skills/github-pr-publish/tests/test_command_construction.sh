@@ -22,7 +22,7 @@ export FAKE_PR_URL="https://github.com/OWNER/REPO/pull/123"
 pass_count=0
 fail() { printf 'not ok - %s\n' "$*" >&2; exit 1; }
 pass() { pass_count=$((pass_count + 1)); printf 'ok %d - %s\n' "$pass_count" "$*"; }
-reset_logs() { : >"$FAKE_GH_LOG"; : >"$FAKE_GIT_LOG"; unset FAKE_DETACHED FAKE_REMOTE_HAS_HEAD FAKE_AUTH_FAIL FAKE_ALLOW_PUSH FAKE_REMOTE_URL FAKE_API_FAIL FAKE_CREATE_404 FAKE_SECRET_TOKEN; export FAKE_REMOTE_URL="git@github.com:OWNER/REPO.git"; export FAKE_REMOTE_HAS_HEAD=1; }
+reset_logs() { : >"$FAKE_GH_LOG"; : >"$FAKE_GIT_LOG"; unset FAKE_DETACHED FAKE_REMOTE_HAS_HEAD FAKE_AUTH_FAIL FAKE_ALLOW_PUSH FAKE_REMOTE_URL FAKE_API_FAIL FAKE_CREATE_404 FAKE_SECRET_TOKEN FAKE_API_INPUT_COPY; export FAKE_REMOTE_URL="git@github.com:OWNER/REPO.git"; export FAKE_REMOTE_HAS_HEAD=1; }
 run_ok() { local out=$1; shift; "$SCRIPT" "$@" >"$out" 2>"$out.err"; }
 run_fail() { local out=$1; shift; if "$SCRIPT" "$@" >"$out" 2>"$out.err"; then cat "$out" "$out.err" >&2; fail "expected failure: $*"; fi; }
 assert_contains() { grep -F -- "$2" "$1" >/dev/null || { cat "$1" >&2; fail "expected '$2' in $1"; }; }
@@ -150,6 +150,22 @@ run_ok "$out" --repo OWNER/REPO --base main --head OWNER:feature-branch --title 
 assert_contains "$FAKE_GH_LOG" 'api -i repos/OWNER/REPO/pulls --method POST'
 assert_contains "$out" 'Pull request created'
 pass 'REST fallback posts after remote-head proof and reports URL'
+
+reset_logs
+template_body="$TEST_TMP/template-body.md"
+payload_copy="$TEST_TMP/rest-template-payload.json"
+printf '## Summary\n\nTemplate body content\n' >"$template_body"
+export FAKE_API_INPUT_COPY="$payload_copy"
+out="$TEST_TMP/rest-template.out"
+run_ok "$out" --repo OWNER/REPO --base main --head OWNER:feature-branch --title 'Add feature' --template "$template_body" --use-rest --yes
+python3 - "$payload_copy" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as f:
+    payload = json.load(f)
+if payload.get("body") != "## Summary\n\nTemplate body content":
+    raise SystemExit(f"unexpected body: {payload.get('body')!r}")
+PY
+pass 'REST fallback sends template content as PR body'
 
 reset_logs
 export FAKE_CREATE_404=1

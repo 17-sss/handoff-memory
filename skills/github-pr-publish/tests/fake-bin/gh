@@ -25,6 +25,17 @@ case "${1:-}" in
     fi
     if [[ "${2:-}" == "-i" ]]; then
       if [[ "${FAKE_API_FAIL:-0}" == "1" ]]; then gh_die 'HTTP 403 Resource not accessible'; fi
+      if [[ -n "${FAKE_API_INPUT_COPY:-}" ]]; then
+        input_file=""
+        while [[ $# -gt 0 ]]; do
+          if [[ "${1:-}" == "--input" ]]; then
+            input_file=${2:-}
+            break
+          fi
+          shift
+        done
+        [[ -n "$input_file" ]] && cp "$input_file" "$FAKE_API_INPUT_COPY"
+      fi
       printf 'HTTP/2 201 Created\n\n{"html_url":"%s","number":123}\n' "$url"; exit 0
     fi
     printf '{}\n'; exit 0

@@ -281,7 +281,13 @@ if [[ $USE_REST -eq 1 ]]; then
   remote_head_exists "$REMOTE" "$HEAD_BRANCH" || die "REST fallback requires an existing remote head"
   payload=$(mktemp)
   body_text=""
-  if [[ -n "$BODY_FILE" ]]; then body_text=$(cat "$BODY_FILE"); else body_text=$BODY; fi
+  if [[ -n "$BODY_FILE" ]]; then
+    body_text=$(cat "$BODY_FILE")
+  elif [[ -n "$BODY" ]]; then
+    body_text=$BODY
+  elif [[ -n "$TEMPLATE" ]]; then
+    body_text=$(cat "$TEMPLATE")
+  fi
   python3 - "$payload" "$TITLE" "$HEAD" "$BASE" "$body_text" "$DRAFT" <<'PY'
 import json, sys
 path, title, head, base, body, draft = sys.argv[1:]
