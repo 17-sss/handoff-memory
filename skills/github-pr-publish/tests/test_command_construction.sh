@@ -27,6 +27,21 @@ run_ok() { local out=$1; shift; "$SCRIPT" "$@" >"$out" 2>"$out.err"; }
 run_fail() { local out=$1; shift; if "$SCRIPT" "$@" >"$out" 2>"$out.err"; then cat "$out" "$out.err" >&2; fail "expected failure: $*"; fi; }
 assert_contains() { grep -F -- "$2" "$1" >/dev/null || { cat "$1" >&2; fail "expected '$2' in $1"; }; }
 assert_not_contains() { ! grep -F -- "$2" "$1" >/dev/null || { cat "$1" >&2; fail "unexpected '$2' in $1"; }; }
+assert_private_tree() {
+  python3 - "$1" <<'PY'
+import os
+import stat
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+paths = [root] + [path for path in root.rglob("*") if path.exists()]
+for path in paths:
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & 0o077:
+        raise SystemExit(f"{path} is not private: {oct(mode)}")
+PY
+}
 
 body="$TEST_TMP/body.md"
 printf 'Summary\n\nTests: fake\n' >"$body"
@@ -181,10 +196,12 @@ reset_logs
 export FAKE_REMOTE_URL='https://x-access-token:super-secret-token@github.com/OWNER/REPO.git'
 collect_dir="$TEST_TMP/collect"
 mkdir -p "$collect_dir"
+chmod 755 "$collect_dir"
 bash "$COLLECT_SCRIPT" --repo OWNER/REPO --output-dir "$collect_dir" >"$TEST_TMP/collect.out" 2>"$TEST_TMP/collect.err"
 assert_not_contains "$collect_dir/remotes.txt" 'super-secret-token'
 assert_not_contains "$collect_dir/remotes.txt" 'x-access-token:'
 assert_contains "$collect_dir/remotes.txt" '[REDACTED]'
-pass 'publish context collector redacts credentialed remote URLs'
+assert_private_tree "$collect_dir"
+pass 'publish context collector redacts credentialed remote URLs with private permissions'
 
 printf 'All %d github-pr-publish tests passed\n' "$pass_count"

@@ -46,6 +46,20 @@ sanitize_file() {
   fi
 }
 
+prepare_output_dir() {
+  local prefix=$1 safe_name=$2 timestamp=$3 tmp_parent
+  umask 077
+  if [[ -z "$OUTPUT_DIR" ]]; then
+    tmp_parent=${TMPDIR:-/tmp}
+    OUTPUT_DIR=$(mktemp -d "$tmp_parent/${prefix}-${safe_name}-${timestamp}.XXXXXX") \
+      || die "failed to create private output directory"
+  else
+    [[ ! -L "$OUTPUT_DIR" ]] || die "output directory must not be a symlink: $OUTPUT_DIR"
+    mkdir -p -m 700 "$OUTPUT_DIR"
+    chmod 700 "$OUTPUT_DIR"
+  fi
+}
+
 classify_error() {
   local err_file=$1
   local message
@@ -164,10 +178,7 @@ fi
 timestamp=$(date +%Y%m%d-%H%M%S)
 safe_ref=${PR_REF:-current-branch}
 safe_ref=${safe_ref//[^A-Za-z0-9._-]/-}
-if [[ -z "$OUTPUT_DIR" ]]; then
-  OUTPUT_DIR="/tmp/github-pr-review-${safe_ref}-${timestamp}"
-fi
-mkdir -p "$OUTPUT_DIR"
+prepare_output_dir "github-pr-review" "$safe_ref" "$timestamp"
 
 auth_file="$OUTPUT_DIR/auth.txt"
 if gh auth status --hostname github.com >/dev/null 2>&1; then

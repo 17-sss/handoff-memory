@@ -34,6 +34,20 @@ sanitize_file() {
   fi
 }
 
+prepare_output_dir() {
+  local prefix=$1 safe_name=$2 timestamp=$3 tmp_parent
+  umask 077
+  if [[ -z "$OUTPUT_DIR" ]]; then
+    tmp_parent=${TMPDIR:-/tmp}
+    OUTPUT_DIR=$(mktemp -d "$tmp_parent/${prefix}-${safe_name}-${timestamp}.XXXXXX") \
+      || die "failed to create private output directory"
+  else
+    [[ ! -L "$OUTPUT_DIR" ]] || die "output directory must not be a symlink: $OUTPUT_DIR"
+    mkdir -p -m 700 "$OUTPUT_DIR"
+    chmod 700 "$OUTPUT_DIR"
+  fi
+}
+
 classify_error_text() {
   local message=$1
   case "$message" in
@@ -80,10 +94,7 @@ command -v gh >/dev/null 2>&1 || die "GitHub CLI 'gh' is required"
 timestamp=$(date +%Y%m%d-%H%M%S)
 safe_repo=${REPO:-current-repo}
 safe_repo=${safe_repo//[^A-Za-z0-9._-]/-}
-if [[ -z "$OUTPUT_DIR" ]]; then
-  OUTPUT_DIR="/tmp/github-pr-publish-${safe_repo}-${timestamp}"
-fi
-mkdir -p "$OUTPUT_DIR"
+prepare_output_dir "github-pr-publish" "$safe_repo" "$timestamp"
 
 if gh auth status --hostname github.com >/dev/null 2>&1; then
   account=$(gh api user --jq .login 2>/dev/null || true)

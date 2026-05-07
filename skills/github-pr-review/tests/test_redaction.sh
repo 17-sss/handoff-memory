@@ -27,6 +27,22 @@ assert_contains() {
   fi
 }
 
+assert_private_tree() {
+  python3 - "$1" <<'PY'
+import os
+import stat
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+paths = [root] + [path for path in root.rglob("*") if path.exists()]
+for path in paths:
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & 0o077:
+        raise SystemExit(f"{path} is not private: {oct(mode)}")
+PY
+}
+
 body="$TEST_TMP/review.md"
 printf 'review body\n' > "$body"
 
@@ -56,5 +72,8 @@ for file in "$collect_dir"/* "$collect_err"; do
 done
 assert_contains "$collect_dir/pr-view.err" '[REDACTED]'
 printf 'ok 2 - collect_pr_context redacts saved gh stderr\n'
+
+assert_private_tree "$collect_dir"
+printf 'ok 3 - collect_pr_context keeps output permissions private\n'
 
 printf 'All github-pr-review redaction tests passed\n'
