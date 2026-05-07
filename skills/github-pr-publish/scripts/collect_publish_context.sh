@@ -15,9 +15,23 @@ USAGE
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 warn() { printf 'warning: %s\n' "$*" >&2; }
 
+sanitize_stream() {
+  sed -E \
+    -e 's/(Authorization:[[:space:]]*)([^[:space:]]+)/\1[REDACTED]/Ig' \
+    -e 's/(token|GH_TOKEN|GITHUB_TOKEN|PAT)=([^[:space:]]+)/\1=[REDACTED]/Ig' \
+    -e 's#https?://[^/@[:space:]]+(:[^/@[:space:]]+)?@#https://[REDACTED]@#g' \
+    -e 's/(github_pat_|gh[pousr]_)[A-Za-z0-9_]+/\1[REDACTED]/g'
+}
+
 sanitize_file() {
-  sed -E -i.bak 's/(Authorization:[[:space:]]*)([^[:space:]]+)/\1[REDACTED]/Ig; s/(token|GH_TOKEN|GITHUB_TOKEN|PAT)=([^[:space:]]+)/\1=[REDACTED]/Ig' "$1" 2>/dev/null || true
-  rm -f "$1.bak"
+  local file=$1 tmp_file
+  [[ -f "$file" ]] || return 0
+  tmp_file="${file}.sanitized.$$"
+  if sanitize_stream <"$file" >"$tmp_file"; then
+    mv "$tmp_file" "$file"
+  else
+    rm -f "$tmp_file"
+  fi
 }
 
 classify_error_text() {
@@ -37,10 +51,13 @@ run_capture() {
   shift 3
   printf 'collecting %s...\n' "$label"
   if ! "$@" >"$out_file" 2>"$err_file"; then
+    sanitize_file "$out_file"
     sanitize_file "$err_file"
     classify_error_text "$(tr '\n' ' ' <"$err_file")"
     return 1
   fi
+  sanitize_file "$out_file"
+  sanitize_file "$err_file"
 }
 
 REPO=""
@@ -92,13 +109,20 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git remote -v >"$OUTPUT_DIR/remotes.txt" 2>/dev/null || true
   git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >"$OUTPUT_DIR/upstream.txt" 2>"$OUTPUT_DIR/upstream.err" || true
   git rev-list --left-right --count '@{u}...HEAD' >"$OUTPUT_DIR/ahead-behind.txt" 2>"$OUTPUT_DIR/ahead-behind.err" || true
+  sanitize_file "$OUTPUT_DIR/remotes.txt"
+  sanitize_file "$OUTPUT_DIR/upstream.err"
+  sanitize_file "$OUTPUT_DIR/ahead-behind.err"
 fi
 
 if [[ -n "$REPO" ]]; then
   gh pr list --repo "$REPO" --head "$(git branch --show-current 2>/dev/null || true)" --json number,title,url,state \
     >"$OUTPUT_DIR/existing-prs.json" 2>"$OUTPUT_DIR/existing-prs.err" || true
+  sanitize_file "$OUTPUT_DIR/existing-prs.json"
+  sanitize_file "$OUTPUT_DIR/existing-prs.err"
 else
   gh pr status >"$OUTPUT_DIR/pr-status.txt" 2>"$OUTPUT_DIR/pr-status.err" || true
+  sanitize_file "$OUTPUT_DIR/pr-status.txt"
+  sanitize_file "$OUTPUT_DIR/pr-status.err"
 fi
 
 {

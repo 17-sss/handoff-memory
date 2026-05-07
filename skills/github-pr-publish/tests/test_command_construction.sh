@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 SCRIPT="$ROOT/skills/github-pr-publish/scripts/create_pr.sh"
+COLLECT_SCRIPT="$ROOT/skills/github-pr-publish/scripts/collect_publish_context.sh"
 FAKE_BIN="$ROOT/skills/github-pr-publish/tests/fake-bin"
 TMPDIR=${TMPDIR:-/tmp}
 TEST_TMP=$(mktemp -d "$TMPDIR/github-pr-publish-tests.XXXXXX")
@@ -159,5 +160,15 @@ assert_contains "$out.err" 'private repos this can mean missing access'
 assert_not_contains "$out.err" 'super-secret-token'
 assert_not_contains "$out.err" 'Authorization: token='
 pass 'private 404 is classified and sensitive auth output is redacted'
+
+reset_logs
+export FAKE_REMOTE_URL='https://x-access-token:super-secret-token@github.com/OWNER/REPO.git'
+collect_dir="$TEST_TMP/collect"
+mkdir -p "$collect_dir"
+bash "$COLLECT_SCRIPT" --repo OWNER/REPO --output-dir "$collect_dir" >"$TEST_TMP/collect.out" 2>"$TEST_TMP/collect.err"
+assert_not_contains "$collect_dir/remotes.txt" 'super-secret-token'
+assert_not_contains "$collect_dir/remotes.txt" 'x-access-token:'
+assert_contains "$collect_dir/remotes.txt" '[REDACTED]'
+pass 'publish context collector redacts credentialed remote URLs'
 
 printf 'All %d github-pr-publish tests passed\n' "$pass_count"
