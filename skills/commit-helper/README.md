@@ -11,6 +11,11 @@ Reusable commit-message helper that inspects explicit repo-local rules, recent h
 - The current repository uses a different style from the last one you touched
 - The repository may restrict emoji-based commits to a local allowlist
 
+
+## Invocation Boundary
+
+When this skill is invoked, commit messages come only from repo-local rules, recent history, staged diff semantics, and explicit user wording. It must not add orchestration metadata, Lore trailers, workflow notes, or automation co-author trailers unless the target repository's own rules or the user explicitly require them. If an external hook demands those non-repo trailers, treat it as a blocker instead of polluting the commit message.
+
 ## Key Files
 
 - `scripts/inspect_commit_style.py`

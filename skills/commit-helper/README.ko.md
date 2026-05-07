@@ -11,6 +11,11 @@
 - 방금 작업한 저장소와 이번 저장소의 커밋 규칙이 다를 수 있을 때
 - emoji 기반 커밋 저장소가 로컬 allowlist를 둘 수 있을 때
 
+
+## 호출 경계
+
+이 스킬이 호출되면 commit message는 repo-local rule, recent history, staged diff semantics, 사용자가 명시한 wording만 근거로 만듭니다. 대상 저장소 자체 규칙이나 사용자의 명시 요청이 없는 한 orchestration metadata, Lore trailer, workflow note, automation co-author trailer를 넣지 않습니다. 외부 hook이 그런 non-repo trailer를 요구하면 commit message를 오염시키지 말고 blocker로 취급합니다.
+
 ## 주요 파일
 
 - `scripts/inspect_commit_style.py`

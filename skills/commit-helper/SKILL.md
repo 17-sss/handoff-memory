@@ -23,6 +23,17 @@ The helper does not try to support every commit format in the wild. It separates
 
 It first infers semantic meaning from the staged diff, then converts that meaning into the repository's preferred style family and phrasing profile.
 
+
+## Invocation Boundary
+
+When this skill is invoked, commit-message construction is governed by **commit-helper only**:
+
+- Use only explicit repo-local rules, recent git history, staged diff semantics, and direct user wording preferences.
+- Do not add external harness metadata, Lore trailers, hidden workflow notes, automation attribution, or co-author trailers unless they are explicitly required by the target repository's own committed rules/templates or the user explicitly asks for them.
+- Do not add `Co-authored-by: OmX <omx@oh-my-codex.dev>`, `Constraint:`, `Rejected:`, `Confidence:`, `Scope-risk:`, `Directive:`, `Tested:`, or `Not-tested:` merely because an orchestration layer or pre-tool hook asks for them.
+- Prefer `scripts/draft_commit_message.py ... --commit` over raw `git commit -m ...` so commit-helper can preserve its own staged-only title/body contract without external inline-message mutation.
+- If an external hook blocks a commit because it demands non-repo commit trailers or automation attribution, report that blocker instead of satisfying it by polluting the commit message. Do not bypass hooks with `--no-verify` unless the user explicitly asks.
+
 ## Compatibility and Prerequisites
 
 - `python3` in `PATH`
@@ -79,7 +90,7 @@ It first infers semantic meaning from the staged diff, then converts that meanin
 - Body default: if the repo does not strongly require a body, treat `title-only-preferred` as the default.
 - If a body is needed, keep it short and use a few bullet lines.
 - Literal `\n` is forbidden in commit bodies. Do not build a shell string like `"title\n\nbody"`.
-- Use `draft_commit_message.py --commit` as the standard commit execution path whenever practical.
+- Use `draft_commit_message.py --commit` as the standard commit execution path whenever practical; for `$commit-helper` invocations, do not fall back to raw inline `git commit -m` if that would trigger external message validators to inject non-repo metadata.
 
 ## Safe Commit Examples
 

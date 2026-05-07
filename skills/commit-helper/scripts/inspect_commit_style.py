@@ -730,14 +730,22 @@ def get_staged_diff(repo: Path) -> str:
 
 
 def get_commit_template_path(repo: Path) -> str | None:
-  template = git(repo, 'config', '--get', 'commit.template', check=False).strip()
+  template = git(repo, 'config', '--local', '--get', 'commit.template', check=False).strip()
   if not template:
     return None
 
   candidate = Path(template)
   if candidate.is_absolute():
-    return str(candidate)
-  return str((repo / candidate).resolve())
+    resolved = candidate.resolve()
+  else:
+    resolved = (repo / candidate).resolve()
+
+  try:
+    resolved.relative_to(repo.resolve())
+  except ValueError:
+    return None
+
+  return str(resolved)
 
 
 def load_text_file(path: Path) -> str | None:

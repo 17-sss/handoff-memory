@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -14,12 +15,13 @@ INSPECT = ROOT / 'scripts/inspect_commit_style.py'
 DRAFT = ROOT / 'scripts/draft_commit_message.py'
 
 
-def run(*args: str) -> subprocess.CompletedProcess[str]:
+def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
   return subprocess.run(
       args,
       capture_output=True,
       text=True,
       check=False,
+      env=env,
   )
 
 
@@ -56,8 +58,8 @@ def make_history_commit(repo: Path, subject: str, *, body: str | None = None, fi
     git(repo, 'commit', '-m', subject)
 
 
-def inspect(repo: Path) -> dict[str, object]:
-  completed = run('python3', str(INSPECT), str(repo))
+def inspect(repo: Path, *, env: dict[str, str] | None = None) -> dict[str, object]:
+  completed = run('python3', str(INSPECT), str(repo), env=env)
   if completed.returncode != 0:
     raise RuntimeError(completed.stderr.strip() or completed.stdout.strip())
   return json.loads(completed.stdout)
@@ -229,6 +231,29 @@ def case_title_only_preferred_repo() -> None:
   assert_equal(drafted['body'], None, 'title-only preferred repos should allow no body')
 
 
+def case_global_commit_template_ignored() -> None:
+  repo = init_repo('commit-helper-global-template')
+  make_history_commit(repo, 'Fix modal close timing')
+  make_history_commit(repo, 'Update validation copy')
+  template_home = Path(tempfile.mkdtemp(prefix='commit-helper-global-template-home-', dir='/tmp'))
+  template_path = template_home / '.gitmessage.txt'
+  write(template_path, 'feat: global conventional template\n\nBody required by global template.\n')
+  write(
+      template_home / '.gitconfig',
+      f'[commit]\n\ttemplate = {template_path}\n',
+  )
+  write(repo / 'src/modal.ts', 'export const modal = true;\n')
+  git(repo, 'add', 'src/modal.ts')
+  env = os.environ.copy()
+  env['HOME'] = str(template_home)
+  env['XDG_CONFIG_HOME'] = str(template_home / '.config')
+  inspected = inspect(repo, env=env)
+  assert_equal(inspected['commit_template_path'], None, 'global templates outside the repo should not be repo-local rules')
+  assert_equal(inspected['repo_has_explicit_commit_rule'], False, 'global templates should not create explicit rule sources')
+  assert_equal(inspected['selected_style_family'], 'plain', 'global templates should not override history-inferred style')
+  assert_equal(inspected['body_policy'], 'title-only-preferred', 'global templates should not require commit bodies')
+
+
 def case_multiline_body_without_literal_backslash_n() -> None:
   repo = init_repo('commit-helper-multiline-body')
   write(
@@ -331,6 +356,26 @@ def case_explicit_gitmoji_repo_with_natural_wording() -> None:
   assert_equal(drafted['polished_summary'], '탭 분리', 'gitmoji repo should still polish awkward Korean wording naturally')
   assert_true(any(emoji in drafted['title'] for emoji in ['🌊', '✨', '🐛', '📦']), 'title should keep an allowed emoji')
 
+def case_commit_helper_invocation_boundary() -> None:
+  repo = init_repo('commit-helper-invocation-boundary')
+  write(repo / 'src/skill.ts', 'export const skill = true;\n')
+  git(repo, 'add', 'src/skill.ts')
+  drafted = json.loads(draft(repo, '--summary', 'add commit helper boundary', '--no-body').stdout)
+  rendered = '\n'.join(str(drafted.get(key) or '') for key in ('title', 'body'))
+  forbidden = (
+      'Co-authored-by: OmX',
+      'Constraint:',
+      'Rejected:',
+      'Confidence:',
+      'Scope-risk:',
+      'Directive:',
+      'Tested:',
+      'Not-tested:',
+  )
+  assert_true(not any(item in rendered for item in forbidden), 'draft should not add external harness trailers')
+  assert_equal(drafted['external_harness_trailers_added'], False, 'payload should report no external harness trailers')
+  assert_true('commit-helper-only' in drafted['external_harness_policy'], 'payload should expose invocation boundary policy')
+
 
 CASES = [
     ('explicit_conventional_repo', case_explicit_conventional_repo),
@@ -341,12 +386,14 @@ CASES = [
     ('actual_validation_bugfix', case_actual_validation_bugfix),
     ('file_move_or_legacy_move', case_file_move_or_legacy_move),
     ('title_only_preferred_repo', case_title_only_preferred_repo),
+    ('global_commit_template_ignored', case_global_commit_template_ignored),
     ('multiline_body_without_literal_backslash_n', case_multiline_body_without_literal_backslash_n),
     ('korean_emoji_repo_phrasing', case_korean_emoji_repo_phrasing),
     ('korean_verbose_summary_polish', case_korean_verbose_summary_polish),
     ('mixed_repo_language_profile', case_mixed_repo_language_profile),
     ('explicit_conventional_repo_with_natural_wording', case_explicit_conventional_repo_with_natural_wording),
     ('explicit_gitmoji_repo_with_natural_wording', case_explicit_gitmoji_repo_with_natural_wording),
+    ('commit_helper_invocation_boundary', case_commit_helper_invocation_boundary),
 ]
 
 

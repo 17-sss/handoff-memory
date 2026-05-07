@@ -32,6 +32,10 @@
     "goal": "Allow safe title-only drafting when history does not require commit bodies."
   },
   {
+    "name": "global_commit_template_ignored",
+    "goal": "Ignore global commit.template files outside the repository when deciding repo-local explicit rules."
+  },
+  {
     "name": "multiline_body_without_literal_backslash_n",
     "goal": "Create multiline commit bodies without storing a literal \\n sequence."
   },
@@ -54,5 +58,9 @@
   {
     "name": "explicit_gitmoji_repo_with_natural_wording",
     "goal": "Keep the allowlist and gitmoji mode while polishing the summary wording to match repo-local phrasing."
+  },
+  {
+    "name": "commit_helper_invocation_boundary",
+    "goal": "When commit-helper is invoked, do not add external orchestration, Lore, or OmX co-author metadata unless repo-local rules or the user explicitly require it."
   }
 ]

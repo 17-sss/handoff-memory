@@ -18,3 +18,4 @@ This package defines the `commit-helper` skill.
 - Keep bugfix detection conservative and avoid mapping presentational changes to bugfix by default.
 - Keep title-only commits as the default unless a repo clearly expects bodies.
 - Never emit commit bodies with a literal `\n` sequence.
+- Preserve the invocation boundary: do not add orchestration/Lore/automation co-author trailers unless repo-local rules or the user explicitly require them. If an external hook demands them, report a blocker instead of changing the commit message.

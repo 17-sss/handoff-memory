@@ -1,8 +1,8 @@
 {
   "name": "commit-helper",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "organization": "17-sss",
-  "date": "April 2026",
-  "abstract": "Generic commit-message helper that inspects explicit repo-local rules, recent history, and staged semantics to support conventional, gitmoji, plain imperative, and repo-custom commit styles with conservative fallback behavior.",
+  "date": "May 2026",
+  "abstract": "Generic commit-message helper that inspects explicit repo-local rules, recent history, and staged semantics to support conventional, gitmoji, plain imperative, and repo-custom commit styles with conservative fallback behavior. When invoked, it preserves a strict commit-helper-only boundary and refuses to add external orchestration, Lore, or automation co-author metadata unless repo-local rules or the user explicitly require it.",
   "references": []
 }

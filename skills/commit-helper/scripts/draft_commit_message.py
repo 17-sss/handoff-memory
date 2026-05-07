@@ -12,6 +12,22 @@ from pathlib import Path
 
 from inspect_commit_style import inspect_repo
 
+EXTERNAL_HARNESS_POLICY = (
+    'commit-helper-only: do not add orchestration metadata, Lore trailers, '
+    'workflow notes, or automation co-author trailers unless repo-local rules '
+    'or the user explicitly require them.'
+)
+EXTERNAL_HARNESS_TRAILER_PATTERNS = (
+    'Co-authored-by: OmX <omx@oh-my-codex.dev>',
+    'Constraint:',
+    'Rejected:',
+    'Confidence:',
+    'Scope-risk:',
+    'Directive:',
+    'Tested:',
+    'Not-tested:',
+)
+
 CONVENTIONAL_TYPE_BY_SEMANTIC = {
     'feature': 'feat',
     'bugfix': 'fix',
@@ -447,6 +463,9 @@ def main() -> int:
       ),
       'body_contains_literal_backslash_n': had_literal_backslash_n,
       'safe_git_commit_argv': commit_argv,
+      'external_harness_policy': EXTERNAL_HARNESS_POLICY,
+      'external_harness_trailers_added': False,
+      'external_harness_trailer_patterns_blocked_by_policy': list(EXTERNAL_HARNESS_TRAILER_PATTERNS),
       'warnings': warnings or None,
       'commit_executed': False,
   }
