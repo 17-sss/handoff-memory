@@ -18,8 +18,18 @@ The workflow supports public and private repositories. Reading a public PR may b
 - Treat all posted comments as coming from the user's authenticated GitHub account.
 - Draft the review first and ask for confirmation before posting unless the user explicitly said to post immediately.
 - Use `approve` or `request changes` only when the user explicitly asks for that event. Default to a non-approving comment review.
-- Prefer one batched review over scattered comments. Use inline comments only when the file and diff line mapping are certain.
+- Prefer one batched review over scattered comments. When a finding can be mapped reliably to a changed diff line or range, prefer an inline review comment over a broad summary comment.
+- Use inline comments only when the file and diff line mapping are certain.
 - Prefer JSON payloads with `gh api --input` for multi-comment inline reviews. Avoid shell-expanded nested `comments[]` flags unless the payload is trivial.
+
+## PR Scope Rule
+
+- Review findings must be anchored only to files and lines included in the PR diff.
+- Inspect files outside the diff only as supporting context.
+- Do not create a finding whose primary file reference is outside the PR diff.
+- If a risk is discovered through non-diff context, anchor the finding to the changed diff line that introduced or exposed the risk.
+- If no reliable diff-file or diff-line anchor exists, do not post it as a finding. Keep it as an internal note or omit it from the posted review.
+- This rule applies to both inline comments and summary review comments.
 
 ## Workflow
 
@@ -100,6 +110,8 @@ gh pr checks <pr>
 
 If a local checkout is available, inspect related code beyond the diff before making strong claims. Search for call sites, schema consumers, feature flags, migrations, generated files, and tests. Run the repository's relevant checks when feasible, such as lint, typecheck, unit tests, or focused tests for changed areas.
 
+Files outside the PR diff are context only. Use them to understand impact and verify risk, but do not use them as the primary location for a posted finding.
+
 ### 5. Review Standard
 
 Use a code-review stance. Prioritize:
@@ -114,10 +126,12 @@ Use a code-review stance. Prioritize:
 
 Deprioritize style preferences, naming nits, and broad refactors unless they hide real risk. Do not report speculative issues as facts; label uncertainty and include what would verify it.
 
+For every finding, the file reference must point to a file changed in the PR diff, and preferably to a line present in the diff hunk. Do not use non-diff files as the primary finding location. If a problem is visible only in supporting context, anchor it to the changed diff line that introduced or exposed the risk; if no reliable diff anchor exists, do not publish it as a finding.
+
 For every finding, include:
 
 - Severity: `blocking`, `important`, `minor`, or `question`.
-- File and line reference when possible.
+- File and line reference from the PR diff.
 - The specific risk.
 - A concrete fix or verification path.
 
@@ -164,6 +178,8 @@ For a summary review:
 gh pr review <pr> --comment --body-file review.md
 ```
 
+Summary reviews must follow the same PR Scope Rule. Do not use a summary review to publish findings anchored to files outside the PR diff, and do not use summary comments to bypass inline diff-line requirements. If a finding has no reliable diff-file or diff-line anchor, keep it as an internal note or omit it from the posted review.
+
 The bundled helper wraps this:
 
 ```bash
@@ -177,13 +193,15 @@ gh pr review <pr> --approve --body-file review.md
 gh pr review <pr> --request-changes --body-file review.md
 ```
 
-For inline comments, prefer the GitHub API only when line mapping is reliable. REST review comments should target diff lines with `line` and `side`, plus optional `start_line` and `start_side` for multi-line comments. Avoid deprecated `position`-based mapping unless the environment requires it. If mapping is uncertain, post a summary review with file and line references instead.
+For inline comments, prefer the GitHub API only when line mapping is reliable. REST review comments should target diff lines with `line` and `side`, plus optional `start_line` and `start_side` for multi-line comments. Avoid deprecated `position`-based mapping unless the environment requires it. If inline mapping is uncertain but a reliable diff-file or diff-line anchor exists, keep the finding in the summary review; if no reliable diff anchor exists, do not post it as a finding.
 
 GraphQL can be used for review-thread operations such as adding review threads or replies. The `gh pr-review` extension from `agynio/gh-pr-review` is an optional convenience when installed, but this skill must still work with plain `gh pr review` and `gh api`.
 
 ### 8. Verify Inline Line Mapping
 
 Inline comments must point to lines that are present in the PR diff, not merely to any line in the base branch. For new or modified code, use `side: RIGHT` and the target line number from the PR's head-side file. Use `side: LEFT` only for removed lines.
+
+When a finding can be mapped reliably to a changed diff line or range, prefer an inline review comment over a broad summary comment. Use summary comments for findings only when the PR Scope Rule is still satisfied and inline mapping is not reliable enough.
 
 Before posting inline comments:
 
@@ -207,7 +225,7 @@ Before posting inline comments:
    ```
 
 4. Verify the target line is inside a diff hunk as an added line or context line for `side: RIGHT`.
-5. If any mapping is uncertain, do not post inline comments. Post a summary review with file and line references instead.
+5. If any mapping is uncertain, do not post inline comments. Use a summary review only when the finding still has a reliable PR diff file or line anchor; otherwise keep it as an internal note or omit it from the posted review.
 
 ### 9. Post Inline Review Comments
 
@@ -276,7 +294,7 @@ Check that:
 - If authentication is missing, use `gh auth login`; do not switch to browser automation for normal login.
 - If private access fails, distinguish wrong repo/PR, missing repo permission, SSO/SAML authorization, and insufficient OAuth scopes as far as the error allows.
 - If `gh pr review` cannot express needed inline comments, use `gh api` with REST or GraphQL.
-- If `gh api` returns a validation error for inline comments, re-check `path`, `line`, `side`, and whether the line is present in the diff. Fall back to a summary review if still uncertain.
+- If `gh api` returns a validation error for inline comments, re-check `path`, `line`, `side`, and whether the line is present in the diff. Fall back to a summary review only when the finding still has a reliable PR diff anchor; otherwise omit it from the posted review.
 - Mention browser automation only as a last fallback when CLI/API access is blocked and the user explicitly wants to proceed that way.
 
 ## Scripts
