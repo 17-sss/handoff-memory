@@ -19,6 +19,7 @@ Agent-neutral workflow for reviewing GitHub pull requests with `gh`, local `git`
 - Posts summary reviews with `gh pr review`
 - Posts reliable inline multi-comment reviews with JSON payloads and `gh api --input`
 - Prefers inline comments when a finding maps reliably to a changed diff line or range
+- Keeps inline review top-level bodies short and leaves routine validation evidence for the assistant response
 - Verifies posted reviews with response `id`, `state`, and `html_url`
 
 ## Package Layout

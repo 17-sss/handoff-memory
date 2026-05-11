@@ -31,6 +31,17 @@ The workflow supports public and private repositories. Reading a public PR may b
 - If no reliable diff-file or diff-line anchor exists, do not post it as a finding. Keep it as an internal note or omit it from the posted review.
 - This rule applies to both inline comments and summary review comments.
 
+## Inline Review Body Style
+
+- When posting inline review comments, keep the top-level GitHub review body minimal.
+- Put the substantive review content in the inline comment itself.
+- Do not include routine validation details such as build commands, test commands, PR check status, unrelated test failures, or remaining-risk notes in the GitHub review body unless they directly affect the posted finding.
+- Report validation evidence to the user in the assistant response, not in the PR review body, unless the user explicitly asks to include it.
+- Include validation details in the PR review body or inline comment only when they are direct evidence for the posted finding.
+- For inline-only reviews, use a short neutral body such as:
+  - `Diff 범위에 inline 코멘트를 남겼습니다.`
+  - `Reviewed the diff and left inline comments.`
+
 ## Workflow
 
 ### 1. Check Authentication
@@ -168,6 +179,8 @@ Summary:
 Reviewed the diff and relevant context. Checks run: <commands or "not run">. Remaining risk: <short note>.
 ```
 
+For inline reviews, the posted GitHub review body should not duplicate the final assistant report. Keep checks run, unrelated test failures, PR check status, and remaining-risk notes out of the PR review body unless they are material to the review finding. Report routine validation evidence in the user-facing final response instead.
+
 ### 7. Publish the Review
 
 Default path: show the draft to the user first. Post only after confirmation.
@@ -236,7 +249,7 @@ Create a temporary payload file. Use a sanitized repo slug and PR number, for ex
 ```json
 {
   "event": "COMMENT",
-  "body": "Reviewed the PR and left inline notes on the risky parts.",
+  "body": "Reviewed the diff and left inline comments.",
   "comments": [
     {
       "path": "src/example.ts",
