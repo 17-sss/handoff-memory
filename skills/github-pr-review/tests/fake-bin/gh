@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+redaction_sentinel='redaction-test-value'
 cmd=${1:-}
 shift || true
 case "$cmd" in
@@ -17,15 +18,15 @@ case "$cmd" in
     shift || true
     case "$sub" in
       review)
-        printf 'HTTP 403 Authorization: token=%s\n' "${FAKE_SECRET_TOKEN:-secret}" >&2
+        printf 'HTTP 403 Authorization: token=%s\n' "$redaction_sentinel" >&2
         exit 1
         ;;
       view)
-        printf 'HTTP 404 Authorization: token=%s url=https://x-access-token:%s@github.com/OWNER/REPO.git\n' "${FAKE_SECRET_TOKEN:-secret}" "${FAKE_SECRET_TOKEN:-secret}" >&2
+        printf 'HTTP 404 Authorization: token=%s url=https://x-access-token:%s@github.com/OWNER/REPO.git\n' "$redaction_sentinel" "$redaction_sentinel" >&2
         exit 1
         ;;
       diff|checks)
-        printf 'Authorization: token=%s\n' "${FAKE_SECRET_TOKEN:-secret}" >&2
+        printf 'Authorization: token=%s\n' "$redaction_sentinel" >&2
         exit 1
         ;;
     esac

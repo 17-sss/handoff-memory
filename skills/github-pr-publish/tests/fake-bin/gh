@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 log=${FAKE_GH_LOG:?FAKE_GH_LOG is required}
+redaction_sentinel='redaction-test-value'
+
+gh_die() { printf '%s\n' "$*" >&2; exit 1; }
+
+require_harness_path() {
+  local label=$1 path=$2 root parent root_real parent_real
+  root=${FAKE_HARNESS_DIR:?FAKE_HARNESS_DIR is required}
+  [[ "$path" == /* ]] || gh_die "$label must be an absolute path under FAKE_HARNESS_DIR"
+  [[ ! -L "$path" ]] || gh_die "$label must not be a symlink"
+  parent=$(dirname "$path")
+  root_real=$(cd "$root" 2>/dev/null && pwd -P) || gh_die "FAKE_HARNESS_DIR does not exist: $root"
+  parent_real=$(cd "$parent" 2>/dev/null && pwd -P) || gh_die "$label parent does not exist: $parent"
+  case "$parent_real/" in
+    "$root_real/"|"$root_real"/*) ;;
+    *) gh_die "$label must stay under FAKE_HARNESS_DIR" ;;
+  esac
+}
+
+require_harness_path "FAKE_GH_LOG" "$log"
 printf 'gh' >>"$log"
 printf ' %q' "$@" >>"$log"
 printf '\n' >>"$log"
@@ -9,8 +28,6 @@ repo=${FAKE_REPO:-OWNER/REPO}
 base=${FAKE_BASE:-main}
 account=${FAKE_ACCOUNT:-octocat}
 url=${FAKE_PR_URL:-https://github.com/OWNER/REPO/pull/123}
-
-gh_die() { printf '%s\n' "$*" >&2; exit 1; }
 
 case "${1:-}" in
   auth)
@@ -34,7 +51,12 @@ case "${1:-}" in
           fi
           shift
         done
-        [[ -n "$input_file" ]] && cp "$input_file" "$FAKE_API_INPUT_COPY"
+        if [[ -n "$input_file" ]]; then
+          require_harness_path "FAKE_API_INPUT_COPY" "$FAKE_API_INPUT_COPY"
+          require_harness_path "API input" "$input_file"
+          [[ -f "$input_file" && ! -L "$input_file" ]] || gh_die "API input must be a regular non-symlink file"
+          cp -- "$input_file" "$FAKE_API_INPUT_COPY"
+        fi
       fi
       printf 'HTTP/2 201 Created\n\n{"html_url":"%s","number":123}\n' "$url"; exit 0
     fi
@@ -48,7 +70,7 @@ case "${1:-}" in
     ;;
   pr)
     if [[ "${2:-}" == "create" ]]; then
-      [[ "${FAKE_CREATE_404:-0}" == "1" ]] && gh_die "HTTP 404 Not Found Authorization: token=${FAKE_SECRET_TOKEN:-secret}"
+      [[ "${FAKE_CREATE_404:-0}" == "1" ]] && gh_die "HTTP 404 Not Found Authorization: token=$redaction_sentinel"
       [[ "${FAKE_CREATE_FAIL:-0}" == "1" ]] && gh_die 'HTTP 422 Validation Failed'
       printf '%s\n' "$url"; exit 0
     fi

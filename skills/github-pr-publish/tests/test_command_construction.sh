@@ -12,6 +12,8 @@ trap 'rm -rf "$TEST_TMP"' EXIT
 export PATH="$FAKE_BIN:$PATH"
 export FAKE_GH_LOG="$TEST_TMP/gh.log"
 export FAKE_GIT_LOG="$TEST_TMP/git.log"
+export FAKE_HARNESS_DIR="$TEST_TMP"
+export TMPDIR="$TEST_TMP"
 export FAKE_REPO="OWNER/REPO"
 export FAKE_REMOTE_URL="git@github.com:OWNER/REPO.git"
 export FAKE_BRANCH="feature-branch"
@@ -22,7 +24,7 @@ export FAKE_PR_URL="https://github.com/OWNER/REPO/pull/123"
 pass_count=0
 fail() { printf 'not ok - %s\n' "$*" >&2; exit 1; }
 pass() { pass_count=$((pass_count + 1)); printf 'ok %d - %s\n' "$pass_count" "$*"; }
-reset_logs() { : >"$FAKE_GH_LOG"; : >"$FAKE_GIT_LOG"; unset FAKE_DETACHED FAKE_REMOTE_HAS_HEAD FAKE_AUTH_FAIL FAKE_ALLOW_PUSH FAKE_REMOTE_URL FAKE_API_FAIL FAKE_CREATE_404 FAKE_SECRET_TOKEN FAKE_API_INPUT_COPY; export FAKE_REMOTE_URL="git@github.com:OWNER/REPO.git"; export FAKE_REMOTE_HAS_HEAD=1; }
+reset_logs() { : >"$FAKE_GH_LOG"; : >"$FAKE_GIT_LOG"; unset FAKE_DETACHED FAKE_REMOTE_HAS_HEAD FAKE_AUTH_FAIL FAKE_ALLOW_PUSH FAKE_REMOTE_URL FAKE_API_FAIL FAKE_CREATE_404 FAKE_API_INPUT_COPY; export FAKE_REMOTE_URL="git@github.com:OWNER/REPO.git"; export FAKE_REMOTE_HAS_HEAD=1; }
 run_ok() { local out=$1; shift; "$SCRIPT" "$@" >"$out" 2>"$out.err"; }
 run_fail() { local out=$1; shift; if "$SCRIPT" "$@" >"$out" 2>"$out.err"; then cat "$out" "$out.err" >&2; fail "expected failure: $*"; fi; }
 assert_contains() { grep -F -- "$2" "$1" >/dev/null || { cat "$1" >&2; fail "expected '$2' in $1"; }; }
@@ -45,6 +47,15 @@ PY
 
 body="$TEST_TMP/body.md"
 printf 'Summary\n\nTests: fake\n' >"$body"
+
+reset_logs
+out="$TEST_TMP/fake-log-escape.out"
+if FAKE_GH_LOG="$TEST_TMP/../outside-gh.log" "$FAKE_BIN/gh" auth status >"$out" 2>"$out.err"; then
+  cat "$out" "$out.err" >&2
+  fail "expected fake gh to reject log path outside harness"
+fi
+assert_contains "$out.err" 'FAKE_GH_LOG must stay under FAKE_HARNESS_DIR'
+pass 'fake gh refuses log paths outside the test harness'
 
 reset_logs
 out="$TEST_TMP/preview.out"
@@ -184,12 +195,12 @@ pass 'REST fallback sends template content as PR body'
 
 reset_logs
 export FAKE_CREATE_404=1
-export FAKE_SECRET_TOKEN='super-secret-token'
 out="$TEST_TMP/private-404.out"
 run_fail "$out" --repo OWNER/REPO --base main --head OWNER:feature-branch --title 'Add feature' --body-file "$body" --yes
 assert_contains "$out.err" 'private repos this can mean missing access'
-assert_not_contains "$out.err" 'super-secret-token'
+assert_not_contains "$out.err" 'redaction-test-value'
 assert_not_contains "$out.err" 'Authorization: token='
+assert_contains "$out.err" '[REDACTED]'
 pass 'private 404 is classified and sensitive auth output is redacted'
 
 reset_logs

@@ -7,7 +7,7 @@ TEST_TMP=$(mktemp -d "${TMPDIR:-/tmp}/github-pr-review-tests.XXXXXX")
 trap 'rm -rf "$TEST_TMP"' EXIT
 
 export PATH="$SCRIPT_DIR/fake-bin:$PATH"
-export FAKE_SECRET_TOKEN='ghp_super_secret_token_1234567890'
+export FAKE_SECRET_TOKEN='redaction-env-should-not-leak'
 
 assert_not_contains() {
   local file=$1 pattern=$2
