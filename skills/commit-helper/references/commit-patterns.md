@@ -86,7 +86,7 @@ Common format:
 
 Use gitmoji strongly only when:
 
-- repo-local gitmoji config exists
+- repo-local gitmoji config exists (`.vscode/settings.json` only counts when it contains `gitmoji.*` keys)
 - repo docs or templates explicitly require emoji commits
 - recent history is clearly emoji-dominant
 

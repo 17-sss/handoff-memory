@@ -107,7 +107,7 @@ When this skill is invoked, commit-message construction is governed by **commit-
 ## Script
 
 - `scripts/inspect_commit_style.py`
-  - inspects explicit rule files such as `AGENTS.md`, `CONTRIBUTING.md`, `README*`, commit templates, commitlint configs, and `.vscode/settings.json`
+  - inspects explicit rule files such as `AGENTS.md`, `CONTRIBUTING.md`, `README*`, commit templates, commitlint configs, and `.vscode/settings.json` only when it contains `gitmoji.*` keys
   - classifies recent history into common style families: `conventional`, `gitmoji`, `plain`, or mixed
   - infers staged semantic categories before choosing a commit style expression
   - infers phrasing profile fields such as `dominant_language`, `dominant_tone`, `title_length_profile`, `common_korean_suffixes`, `common_action_nouns`, `preferred_summary_style`, and `avoid_report_like_phrasing`

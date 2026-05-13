@@ -27,7 +27,7 @@
 
 - `explicit local rules > recent history > conservative fallback` 우선순위를 따릅니다
 - 강한 신호가 없으면 Conventional Commit을 기본 fallback으로 사용합니다
-- gitmoji는 repo-local config, repo 문서, emoji-dominant history가 있을 때만 강하게 활성화합니다
+- gitmoji는 repo-local config, repo 문서, emoji-dominant history가 있을 때만 강하게 활성화합니다. `.vscode/settings.json`은 `gitmoji.*` 키가 있을 때만 repo-local gitmoji config로 봅니다
 - semantic inference는 전역 규칙으로 유지하고, 표현 형식만 repo별 스타일에 맞게 바꿉니다
 - commit `format`과 commit `phrasing`을 분리해 다룹니다
 - dominant language, tone, title length, common Korean action noun 같은 wording profile을 추론합니다

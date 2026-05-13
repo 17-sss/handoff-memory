@@ -1000,8 +1000,6 @@ def detect_gitmoji_constraints(repo: Path) -> dict[str, object | None]:
   if not settings_path.exists():
     return payload
 
-  payload['gitmoji_config_path'] = str(settings_path)
-
   try:
     settings = load_jsonc(settings_path)
   except (OSError, json.JSONDecodeError) as exc:
@@ -1011,6 +1009,11 @@ def detect_gitmoji_constraints(repo: Path) -> dict[str, object | None]:
   if not isinstance(settings, dict):
     payload['gitmoji_config_error'] = 'settings.json did not parse to an object'
     return payload
+
+  if not any(isinstance(key, str) and key.startswith('gitmoji.') for key in settings):
+    return payload
+
+  payload['gitmoji_config_path'] = str(settings_path)
 
   only_custom = settings.get('gitmoji.onlyUseCustomEmoji')
   if isinstance(only_custom, bool):

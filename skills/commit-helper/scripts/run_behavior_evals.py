@@ -137,6 +137,61 @@ def case_explicit_gitmoji_allowlist_repo() -> None:
   assert_true(completed.returncode != 0, 'emoji outside the allowlist should be rejected')
 
 
+def case_vscode_settings_gitmoji_signal_detection() -> None:
+  no_settings_repo = init_repo('commit-helper-no-vscode-settings')
+  make_history_commit(no_settings_repo, 'feat: add bootstrap config')
+  make_history_commit(no_settings_repo, 'fix: adjust bootstrap config')
+  write(no_settings_repo / 'src/config.ts', 'export const enabled = true;\n')
+  git(no_settings_repo, 'add', 'src/config.ts')
+  no_settings = inspect(no_settings_repo)
+  assert_equal(no_settings['gitmoji_config_path'], None, 'missing settings should not set gitmoji_config_path')
+  assert_equal(no_settings['repo_has_gitmoji_signal'], False, 'missing settings should not create a gitmoji signal')
+  assert_equal(no_settings['selected_style_family'], 'conventional', 'conventional history should remain conventional without settings')
+
+  non_gitmoji_repo = init_repo('commit-helper-vscode-no-gitmoji')
+  write(
+      non_gitmoji_repo / '.vscode/settings.json',
+      json.dumps(
+          {
+              'editor.formatOnSave': True,
+              'typescript.preferences.importModuleSpecifier': 'relative',
+          },
+          indent=2,
+      )
+      + '\n',
+  )
+  git(non_gitmoji_repo, 'add', '.vscode/settings.json')
+  git(non_gitmoji_repo, 'commit', '-m', 'chore: add editor settings')
+  make_history_commit(non_gitmoji_repo, 'feat: add backend route')
+  make_history_commit(non_gitmoji_repo, 'fix: adjust backend route')
+  write(non_gitmoji_repo / 'src/route.ts', 'export const route = true;\n')
+  git(non_gitmoji_repo, 'add', 'src/route.ts')
+  non_gitmoji = inspect(non_gitmoji_repo)
+  assert_equal(non_gitmoji['gitmoji_config_path'], None, 'settings without gitmoji keys should not set gitmoji_config_path')
+  assert_equal(non_gitmoji['repo_has_gitmoji_signal'], False, 'settings without gitmoji keys should not create a gitmoji signal')
+  assert_equal(non_gitmoji['repo_has_explicit_commit_rule'], False, 'settings without gitmoji keys should not become an explicit rule source')
+  assert_equal(non_gitmoji['selected_style_family'], 'conventional', 'conventional history should remain conventional with unrelated settings')
+
+  gitmoji_repo = init_repo('commit-helper-vscode-gitmoji')
+  settings = {
+      'editor.formatOnSave': True,
+      'gitmoji.addCustomEmoji': [
+          {'emoji': '✨', 'code': ':sparkles:', 'description': 'Add features'},
+          {'emoji': '🛠️', 'code': ':hammer_and_wrench:', 'description': 'Modify code safely'},
+      ],
+  }
+  write(gitmoji_repo / '.vscode/settings.json', json.dumps(settings, ensure_ascii=False, indent=2) + '\n')
+  git(gitmoji_repo, 'add', '.vscode/settings.json')
+  git(gitmoji_repo, 'commit', '-m', 'chore: add editor settings')
+  make_history_commit(gitmoji_repo, 'feat: add frontend route')
+  write(gitmoji_repo / 'src/route.ts', 'export const route = true;\n')
+  git(gitmoji_repo, 'add', 'src/route.ts')
+  gitmoji = inspect(gitmoji_repo)
+  assert_true(gitmoji['gitmoji_config_path'], 'settings with gitmoji keys should set gitmoji_config_path')
+  assert_equal(gitmoji['repo_has_gitmoji_signal'], True, 'settings with gitmoji keys should create a gitmoji signal')
+  assert_equal(gitmoji['selected_style_family'], 'gitmoji', 'gitmoji settings should override conventional history')
+
+
 def case_plain_imperative_history_repo() -> None:
   repo = init_repo('commit-helper-plain-history')
   make_history_commit(repo, 'Fix modal close timing')
@@ -380,6 +435,7 @@ def case_commit_helper_invocation_boundary() -> None:
 CASES = [
     ('explicit_conventional_repo', case_explicit_conventional_repo),
     ('explicit_gitmoji_allowlist_repo', case_explicit_gitmoji_allowlist_repo),
+    ('vscode_settings_gitmoji_signal_detection', case_vscode_settings_gitmoji_signal_detection),
     ('plain_imperative_history_repo', case_plain_imperative_history_repo),
     ('mixed_history_without_rules', case_mixed_history_without_rules),
     ('presentational_modal_cleanup', case_presentational_modal_cleanup),
